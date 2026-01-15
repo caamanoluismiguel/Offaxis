@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>OffAxis 3D</title>
+    <title>OffAxis 3D + STL</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #08080c;
+            background: #000;
             overflow: hidden;
             font-family: -apple-system, sans-serif;
             touch-action: none;
@@ -24,13 +24,13 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 120px;
-            height: 160px;
-            border-radius: 12px;
+            width: 100px;
+            height: 130px;
+            border-radius: 10px;
             overflow: hidden;
             z-index: 100;
             background: #000;
-            border: 2px solid #ff6600;
+            border: 2px solid rgba(255,102,0,0.5);
         }
         #pip video {
             width: 100%;
@@ -45,73 +45,135 @@
             height: 100%;
             pointer-events: none;
         }
-        #trackDot {
+        #dot {
             position: absolute;
-            top: 8px; left: 8px;
-            width: 10px; height: 10px;
+            top: 6px; left: 6px;
+            width: 8px; height: 8px;
             border-radius: 50%;
             background: #ff3b30;
-            transition: all 0.3s;
         }
-        #trackDot.on { background: #30d158; box-shadow: 0 0 10px #30d158; }
+        #dot.on { background: #30d158; box-shadow: 0 0 8px #30d158; }
         
-        /* Debug */
-        #debug {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            right: 150px;
-            max-height: 35vh;
-            background: rgba(0,0,0,0.9);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 10px;
-            color: #0f0;
-            overflow-y: auto;
-            z-index: 1000;
-        }
-        #debug .e { color: #f55; }
-        #debug .w { color: #fa0; }
-        #debug .s { color: #0f0; }
-        
-        /* Status */
+        /* Status panel */
         #status {
             position: fixed;
             top: 10px;
             right: 10px;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.85);
             border: 1px solid #333;
             border-radius: 8px;
             padding: 10px;
             font-size: 10px;
             color: #fff;
             z-index: 100;
-            min-width: 130px;
+            min-width: 120px;
+            font-family: monospace;
         }
-        #status div { margin: 3px 0; display: flex; justify-content: space-between; }
-        #status .v { color: #ff6600; font-family: monospace; }
+        #status div { margin: 3px 0; display: flex; justify-content: space-between; gap: 10px; }
+        #status .v { color: #ff6600; }
+        #status .ok { color: #30d158; }
+        #status .err { color: #ff3b30; }
         
-        /* Objects */
+        /* Objects panel */
         #objs {
             position: fixed;
             left: 16px;
-            bottom: 20px;
+            top: 50%;
+            transform: translateY(-50%);
             display: flex;
-            gap: 8px;
+            flex-direction: column;
+            gap: 10px;
             z-index: 100;
         }
         .ob {
-            width: 44px; height: 44px;
-            border-radius: 10px;
+            width: 46px; height: 46px;
+            border-radius: 12px;
             border: none;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.08);
             color: #fff;
-            font-size: 18px;
+            font-size: 20px;
             cursor: pointer;
         }
-        .ob.on { background: rgba(255,102,0,0.3); box-shadow: 0 0 0 2px #ff6600; }
+        .ob.on { 
+            background: rgba(255,102,0,0.25); 
+            box-shadow: 0 0 0 2px #ff6600;
+        }
+        
+        /* Upload button */
+        #uploadBtn {
+            width: 46px; height: 46px;
+            border-radius: 12px;
+            border: 2px dashed rgba(255,102,0,0.5);
+            background: rgba(255,102,0,0.1);
+            color: #ff6600;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        #uploadBtn:active {
+            background: rgba(255,102,0,0.3);
+        }
+        
+        /* Model info */
+        #modelInfo {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 8px 16px;
+            border-radius: 16px;
+            color: #fff;
+            font-size: 11px;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        #modelInfo.show { display: flex; }
+        #modelInfo .name { color: #ff6600; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #modelInfo .close { background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 0; margin-left: 8px; }
+        
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 500;
+        }
+        #loading.show { display: flex; }
+        .spin {
+            width: 36px; height: 36px;
+            border: 3px solid rgba(255,102,0,0.2);
+            border-top-color: #ff6600;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loading p { color: #fff; margin-top: 12px; font-size: 13px; }
+        
+        /* Debug log */
+        #debugLog {
+            position: fixed;
+            bottom: 160px;
+            right: 10px;
+            width: 140px;
+            max-height: 150px;
+            background: rgba(0,0,0,0.85);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 9px;
+            font-family: monospace;
+            color: #0f0;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        #debugLog .e { color: #f55; }
+        #debugLog .w { color: #fa0; }
     </style>
 </head>
 <body>
@@ -120,159 +182,434 @@
     <div id="pip">
         <video id="vid" playsinline autoplay muted></video>
         <canvas id="ovr"></canvas>
-        <div id="trackDot"></div>
+        <div id="dot"></div>
     </div>
-    
-    <div id="debug"></div>
     
     <div id="status">
-        <div>Camera <span class="v" id="sCam">--</span></div>
-        <div>Video <span class="v" id="sVid">--</span></div>
-        <div>Model <span class="v" id="sMod">--</span></div>
-        <div>Faces <span class="v" id="sFace">--</span></div>
+        <div>Cam <span class="v" id="sCam">--</span></div>
+        <div>Track <span class="v" id="sTrack">--</span></div>
+        <div>Face <span class="v" id="sFace">--</span></div>
         <div>X <span class="v" id="sX">0</span></div>
         <div>Y <span class="v" id="sY">0</span></div>
+        <div>Model <span class="v" id="sModel">--</span></div>
     </div>
+    
+    <div id="debugLog"></div>
     
     <div id="objs">
-        <button class="ob on" data-o="shoe">👟</button>
+        <button class="ob on" data-o="sneaker">👟</button>
         <button class="ob" data-o="cube">🎲</button>
         <button class="ob" data-o="gem">💎</button>
+        <button id="uploadBtn">📁</button>
+        <input type="file" id="fileInput" accept=".stl,.STL" style="display:none">
+    </div>
+    
+    <div id="modelInfo">
+        <span>📦</span>
+        <span class="name" id="modelName"></span>
+        <button class="close" id="clearModel">✕</button>
+    </div>
+    
+    <div id="loading">
+        <div class="spin"></div>
+        <p id="loadTxt">Loading...</p>
     </div>
 
-    <!-- THREE.JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- MediaPipe Face Detection - OFFICIAL GOOGLE CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     
     <script>
     (function() {
         'use strict';
         
+        // ============ DEBUG SYSTEM ============
         const $ = id => document.getElementById(id);
-        const dbg = $('debug');
-        let lc = 0;
+        const logEl = $('debugLog');
         
-        function log(m, t='s') {
+        function log(msg, type = '') {
             const d = document.createElement('div');
-            d.className = t;
-            d.textContent = `[${++lc}] ${m}`;
-            dbg.appendChild(d);
-            dbg.scrollTop = dbg.scrollHeight;
-            console.log(`[${t}] ${m}`);
+            d.className = type;
+            d.textContent = msg;
+            logEl.appendChild(d);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[${type||'i'}] ${msg}`);
         }
         
-        function stat(id, v, c) {
-            const e = $(id);
-            if (e) { e.textContent = v; if (c) e.style.color = c; }
+        function stat(id, val, cls) {
+            const el = $(id);
+            if (el) {
+                el.textContent = val;
+                el.className = 'v ' + (cls || '');
+            }
         }
         
-        // =====================
-        // MAIN APP
-        // =====================
+        // ============ STL LOADER ============
+        function parseSTL(buffer) {
+            log('Parsing STL...');
+            
+            function isBinary(data) {
+                const reader = new DataView(data);
+                const faceSize = (32/8*3) + ((32/8*3)*3) + (16/8);
+                const nFaces = reader.getUint32(80, true);
+                const expect = 80 + (32/8) + (nFaces * faceSize);
+                if (expect === reader.byteLength) return true;
+                // Check for "solid" text
+                const solid = [115, 111, 108, 105, 100];
+                for (let i = 0; i < 5; i++) {
+                    if (solid[i] !== reader.getUint8(i)) return true;
+                }
+                return false;
+            }
+            
+            function parseBinary(data) {
+                const reader = new DataView(data);
+                const faces = reader.getUint32(80, true);
+                log(`Binary STL: ${faces} faces`);
+                
+                const vertices = new Float32Array(faces * 3 * 3);
+                const normals = new Float32Array(faces * 3 * 3);
+                
+                const dataOffset = 84;
+                const faceLength = 12 * 4 + 2;
+                
+                for (let face = 0; face < faces; face++) {
+                    const start = dataOffset + face * faceLength;
+                    const nx = reader.getFloat32(start, true);
+                    const ny = reader.getFloat32(start + 4, true);
+                    const nz = reader.getFloat32(start + 8, true);
+                    
+                    for (let i = 1; i <= 3; i++) {
+                        const vStart = start + i * 12;
+                        const idx = (face * 9) + ((i-1) * 3);
+                        
+                        vertices[idx] = reader.getFloat32(vStart, true);
+                        vertices[idx + 1] = reader.getFloat32(vStart + 4, true);
+                        vertices[idx + 2] = reader.getFloat32(vStart + 8, true);
+                        
+                        normals[idx] = nx;
+                        normals[idx + 1] = ny;
+                        normals[idx + 2] = nz;
+                    }
+                }
+                
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+                geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                return geo;
+            }
+            
+            function parseASCII(text) {
+                log('ASCII STL format');
+                const lines = text.split('\n');
+                const vertices = [];
+                const normals = [];
+                let currentNormal = [0, 0, 1];
+                
+                for (const line of lines) {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts[0] === 'facet' && parts[1] === 'normal') {
+                        currentNormal = [parseFloat(parts[2]), parseFloat(parts[3]), parseFloat(parts[4])];
+                    } else if (parts[0] === 'vertex') {
+                        vertices.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+                        normals.push(...currentNormal);
+                    }
+                }
+                
+                log(`ASCII STL: ${vertices.length/9} faces`);
+                
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                return geo;
+            }
+            
+            if (isBinary(buffer)) {
+                return parseBinary(buffer);
+            } else {
+                const text = new TextDecoder().decode(buffer);
+                return parseASCII(text);
+            }
+        }
+        
+        // ============ MAIN APP ============
         class App {
             constructor() {
-                log('Starting app...');
+                log('App starting...');
                 
                 this.vid = $('vid');
                 this.ovr = $('ovr');
                 this.ctx = null;
-                this.faceDetector = null;
+                this.detector = null;
                 
                 this.scene = null;
                 this.camera = null;
                 this.renderer = null;
                 this.obj = null;
-                this.grid = null;
+                this.room = null;
                 
-                this.face = { x: 0, y: 0, z: 500 };
-                this.smooth = { x: 0, y: 0, z: 500 };
+                this.face = { x: 0, y: 0, z: 400 };
+                this.smooth = { x: 0, y: 0, z: 400 };
                 this.tracking = false;
+                this.faceCount = 0;
                 
                 this.init();
             }
             
             async init() {
                 try {
-                    log('Setting up 3D...');
+                    log('Init 3D...');
                     this.setup3D();
-                    log('3D ready ✓', 's');
+                    stat('sModel', 'sneaker', 'ok');
                     
-                    log('Setting up camera...');
+                    log('Init camera...');
                     await this.setupCamera();
                     
-                    log('Setting up face detection...');
-                    await this.setupFaceDetection();
+                    log('Init tracking...');
+                    await this.setupTracking();
                     
+                    log('Init UI...');
                     this.setupUI();
+                    
+                    log('Starting render...');
                     this.animate();
                     
-                    log('=== ALL READY ===', 's');
+                    log('Ready!', 'ok');
                 } catch (err) {
-                    log(`ERROR: ${err.message}`, 'e');
+                    log(`Error: ${err.message}`, 'e');
                 }
             }
             
             setup3D() {
                 const canvas = $('canvas3d');
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 1, 5000);
-                this.camera.position.z = 500;
+                this.camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 1, 5000);
+                this.camera.position.z = 400;
                 
                 this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
                 this.renderer.setSize(innerWidth, innerHeight);
                 this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-                this.renderer.setClearColor(0x08080c);
+                this.renderer.setClearColor(0x050508);
                 
+                // Lights
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-                const light = new THREE.DirectionalLight(0xffffff, 1);
-                light.position.set(100, 150, 100);
-                this.scene.add(light);
+                const main = new THREE.DirectionalLight(0xffffff, 1);
+                main.position.set(50, 100, 100);
+                this.scene.add(main);
+                const back = new THREE.DirectionalLight(0xff6600, 0.5);
+                back.position.set(-50, -50, -100);
+                this.scene.add(back);
+                const blue = new THREE.PointLight(0x0066ff, 0.4, 500);
+                blue.position.set(0, 100, -150);
+                this.scene.add(blue);
                 
-                this.grid = new THREE.GridHelper(400, 20, 0xff6600, 0x1a0800);
-                this.grid.position.y = -80;
-                this.scene.add(this.grid);
+                this.createRoom();
+                this.makeObj('sneaker');
+            }
+            
+            createRoom() {
+                this.room = new THREE.Group();
+                const gc = 0xff6600, gd = 0x1a0800;
+                const D = 400, W = 350, H = 250;
                 
-                this.makeObj('shoe');
+                // Floor
+                const floor = new THREE.GridHelper(W*2, 24, gc, gd);
+                floor.position.set(0, -H/2, -D/2);
+                floor.material.transparent = true;
+                floor.material.opacity = 0.7;
+                this.room.add(floor);
+                
+                // Back
+                const back = new THREE.GridHelper(W*2, 24, gc, gd);
+                back.rotation.x = Math.PI/2;
+                back.position.z = -D;
+                back.material.transparent = true;
+                back.material.opacity = 0.6;
+                this.room.add(back);
+                
+                // Left
+                const left = new THREE.GridHelper(D, 16, gc, gd);
+                left.rotation.z = Math.PI/2;
+                left.position.set(-W, 0, -D/2);
+                left.material.transparent = true;
+                left.material.opacity = 0.4;
+                this.room.add(left);
+                
+                // Right
+                const right = new THREE.GridHelper(D, 16, gc, gd);
+                right.rotation.z = Math.PI/2;
+                right.position.set(W, 0, -D/2);
+                right.material.transparent = true;
+                right.material.opacity = 0.4;
+                this.room.add(right);
+                
+                // Ceiling
+                const ceil = new THREE.GridHelper(W*2, 24, gc, gd);
+                ceil.position.set(0, H/2, -D/2);
+                ceil.material.transparent = true;
+                ceil.material.opacity = 0.15;
+                this.room.add(ceil);
+                
+                // Corner lines
+                const lm = new THREE.LineBasicMaterial({color: gc, transparent: true, opacity: 0.5});
+                [[-W,-H/2],[W,-H/2],[-W,H/2],[W,H/2]].forEach(([x,y]) => {
+                    const g = new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(x,y,0), new THREE.Vector3(x,y,-D)
+                    ]);
+                    this.room.add(new THREE.Line(g, lm));
+                });
+                
+                // Horizon
+                const hg = new THREE.PlaneGeometry(W*3, 4);
+                const hm = new THREE.MeshBasicMaterial({color: gc, transparent: true, opacity: 0.8});
+                const hz = new THREE.Mesh(hg, hm);
+                hz.position.set(0, -H/2+2, -D+1);
+                this.room.add(hz);
+                
+                this.scene.add(this.room);
             }
             
             makeObj(type) {
                 if (this.obj) this.scene.remove(this.obj);
+                $('modelInfo').classList.remove('show');
+                stat('sModel', type, 'ok');
+                
                 const g = new THREE.Group();
                 
-                if (type === 'shoe') {
-                    g.add(new THREE.Mesh(new THREE.BoxGeometry(100,14,40), new THREE.MeshPhysicalMaterial({color:0x1a1a1a})));
-                    g.children[0].position.y = -30;
-                    const mid = new THREE.Mesh(new THREE.BoxGeometry(95,18,38), new THREE.MeshPhysicalMaterial({color:0xffffff}));
-                    mid.position.y = -16; g.add(mid);
-                    const up = new THREE.Mesh(new THREE.BoxGeometry(85,35,34), new THREE.MeshPhysicalMaterial({color:0x2d2d2d}));
-                    up.position.y = 8; g.add(up);
+                if (type === 'sneaker') {
+                    const s = 1.4;
+                    const sole = new THREE.Mesh(new THREE.BoxGeometry(130*s,12*s,50*s), new THREE.MeshPhysicalMaterial({color:0x0a0a0a,roughness:0.9}));
+                    sole.position.y = -45*s; g.add(sole);
+                    
+                    const mid = new THREE.Mesh(new THREE.BoxGeometry(125*s,22*s,48*s), new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:0.3}));
+                    mid.position.y = -28*s; g.add(mid);
+                    
+                    const upper = new THREE.Mesh(new THREE.BoxGeometry(115*s,45*s,44*s), new THREE.MeshPhysicalMaterial({color:0x1a1a1a,roughness:0.7}));
+                    upper.position.y = 5*s; g.add(upper);
+                    
+                    const toe = new THREE.Mesh(new THREE.SphereGeometry(28*s,20,20), new THREE.MeshPhysicalMaterial({color:0x252525}));
+                    toe.position.set(50*s,0,0); toe.scale.set(1.3,0.65,1); g.add(toe);
+                    
                     for (let i=0; i<3; i++) {
-                        const s = new THREE.Mesh(new THREE.BoxGeometry(4,26,36), new THREE.MeshBasicMaterial({color:0xff6600}));
-                        s.position.set(-10+i*18, 8, 0); s.rotation.z = 0.25; g.add(s);
+                        const st = new THREE.Mesh(new THREE.BoxGeometry(5*s,35*s,46*s), new THREE.MeshBasicMaterial({color:0xff6600}));
+                        st.position.set((-15+i*25)*s,8*s,0); st.rotation.z=0.2; g.add(st);
                     }
-                    g.rotation.y = -0.4; g.position.y = 10;
+                    
+                    const heel = new THREE.Mesh(new THREE.BoxGeometry(16*s,35*s,22*s), new THREE.MeshPhysicalMaterial({color:0xffcc00}));
+                    heel.position.set(-58*s,18*s,0); g.add(heel);
+                    
+                    g.rotation.y = -0.35;
+                    g.position.set(0, 20, -80);
+                    
                 } else if (type === 'cube') {
-                    g.add(new THREE.Mesh(new THREE.BoxGeometry(80,80,80), new THREE.MeshPhysicalMaterial({color:0xff6600,metalness:0.3})));
+                    const c = new THREE.Mesh(new THREE.BoxGeometry(100,100,100), new THREE.MeshPhysicalMaterial({color:0xff6600,metalness:0.4,clearcoat:0.8}));
+                    g.add(c);
+                    const w = new THREE.Mesh(new THREE.BoxGeometry(102,102,102), new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:0.3}));
+                    g.add(w);
+                    g.position.z = -80;
+                    
                 } else if (type === 'gem') {
-                    g.add(new THREE.Mesh(new THREE.OctahedronGeometry(50,0), new THREE.MeshPhysicalMaterial({color:0xff00ff,clearcoat:1})));
+                    const gm = new THREE.Mesh(new THREE.OctahedronGeometry(70,0), new THREE.MeshPhysicalMaterial({color:0xff00ff,clearcoat:1,transparent:true,opacity:0.9}));
+                    g.add(gm);
+                    [0x00ffff,0xff00ff,0xffff00].forEach((c,i) => {
+                        const r = new THREE.Mesh(new THREE.TorusGeometry(90+i*25,2,8,64), new THREE.MeshBasicMaterial({color:c}));
+                        r.rotation.x = Math.PI/2+i*0.4; r.rotation.y = i*0.5;
+                        r.userData.spd = 0.01+i*0.005;
+                        g.add(r);
+                    });
+                    g.position.z = -80;
                 }
                 
                 this.obj = g;
                 this.scene.add(this.obj);
+                log(`Object: ${type}`);
+            }
+            
+            loadSTL(file) {
+                log(`Loading: ${file.name}`);
+                $('loading').classList.add('show');
+                $('loadTxt').textContent = `Loading ${file.name}...`;
+                stat('sModel', 'loading...', 'w');
+                
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    try {
+                        log('Parsing STL data...');
+                        const geo = parseSTL(e.target.result);
+                        
+                        // Center geometry
+                        geo.computeBoundingBox();
+                        const box = geo.boundingBox;
+                        const center = new THREE.Vector3();
+                        box.getCenter(center);
+                        geo.translate(-center.x, -center.y, -center.z);
+                        
+                        // Scale to fit
+                        const size = new THREE.Vector3();
+                        box.getSize(size);
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        const scale = 150 / maxDim;
+                        geo.scale(scale, scale, scale);
+                        
+                        log(`Size: ${size.x.toFixed(0)}x${size.y.toFixed(0)}x${size.z.toFixed(0)}, scale: ${scale.toFixed(3)}`);
+                        
+                        // Compute vertex normals for smooth shading
+                        geo.computeVertexNormals();
+                        
+                        // Remove old
+                        if (this.obj) this.scene.remove(this.obj);
+                        
+                        // Create mesh
+                        const mat = new THREE.MeshPhysicalMaterial({
+                            color: 0xff6600,
+                            metalness: 0.3,
+                            roughness: 0.4,
+                            clearcoat: 0.3,
+                            side: THREE.DoubleSide
+                        });
+                        
+                        const mesh = new THREE.Mesh(geo, mat);
+                        const group = new THREE.Group();
+                        group.add(mesh);
+                        group.position.z = -80;
+                        
+                        this.obj = group;
+                        this.scene.add(this.obj);
+                        
+                        // Update UI
+                        $('modelName').textContent = file.name;
+                        $('modelInfo').classList.add('show');
+                        document.querySelectorAll('.ob').forEach(b => b.classList.remove('on'));
+                        
+                        stat('sModel', file.name.slice(0,10), 'ok');
+                        $('loading').classList.remove('show');
+                        log(`Loaded: ${file.name}`, 'ok');
+                        
+                    } catch (err) {
+                        $('loading').classList.remove('show');
+                        stat('sModel', 'ERROR', 'err');
+                        log(`STL Error: ${err.message}`, 'e');
+                        alert('Error loading STL:\n' + err.message);
+                    }
+                };
+                
+                reader.onerror = () => {
+                    $('loading').classList.remove('show');
+                    stat('sModel', 'ERROR', 'err');
+                    log('File read error', 'e');
+                    alert('Error reading file');
+                };
+                
+                reader.readAsArrayBuffer(file);
             }
             
             async setupCamera() {
-                stat('sCam', '...', '#fa0');
-                
+                stat('sCam', '...', '');
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
                         audio: false
                     });
-                    
                     this.vid.srcObject = stream;
                     
                     await new Promise((res, rej) => {
@@ -282,327 +619,237 @@
                             this.ctx = this.ovr.getContext('2d');
                             this.vid.play().then(res).catch(rej);
                         };
-                        setTimeout(() => rej(new Error('Timeout')), 10000);
+                        setTimeout(() => rej(new Error('Timeout')), 8000);
                     });
                     
-                    stat('sCam', 'OK', '#0f0');
-                    stat('sVid', `${this.vid.videoWidth}x${this.vid.videoHeight}`, '#0f0');
-                    log(`Camera: ${this.vid.videoWidth}x${this.vid.videoHeight} ✓`, 's');
-                    
+                    stat('sCam', 'OK', 'ok');
+                    log(`Cam: ${this.vid.videoWidth}x${this.vid.videoHeight}`);
                 } catch (err) {
-                    log(`Camera error: ${err.message}`, 'e');
-                    stat('sCam', 'FAIL', '#f55');
+                    stat('sCam', 'FAIL', 'err');
+                    log(`Cam error: ${err.message}`, 'e');
                     this.setupTouch();
                 }
             }
             
             setupTouch() {
+                stat('sTrack', 'Touch', 'w');
                 log('Using touch fallback', 'w');
+                
                 const upd = (x, y) => {
-                    this.face.x = -((x/innerWidth) - 0.5) * 300;
-                    this.face.y = -((y/innerHeight) - 0.5) * 200;
+                    this.face.x = -((x/innerWidth) - 0.5) * 400;
+                    this.face.y = -((y/innerHeight) - 0.5) * 300;
                     this.tracking = true;
-                    $('trackDot').classList.add('on');
+                    $('dot').classList.add('on');
+                    stat('sFace', 'Touch', 'ok');
                 };
+                
                 document.addEventListener('mousemove', e => upd(e.clientX, e.clientY));
-                document.addEventListener('touchmove', e => { e.preventDefault(); upd(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+                document.addEventListener('touchmove', e => {
+                    e.preventDefault();
+                    upd(e.touches[0].clientX, e.touches[0].clientY);
+                }, { passive: false });
             }
             
-            async setupFaceDetection() {
+            async setupTracking() {
                 if (!this.vid.srcObject) {
-                    log('No camera - skip face detection', 'w');
+                    stat('sTrack', 'None', 'err');
                     return;
                 }
                 
-                stat('sMod', '...', '#fa0');
+                stat('sTrack', '...', '');
                 
-                // Check if MediaPipe loaded
-                if (typeof FaceDetection === 'undefined') {
-                    log('MediaPipe not loaded, trying alternative...', 'w');
-                    await this.setupFaceDetectionAlt();
-                    return;
+                // Try MediaPipe
+                if (typeof FaceDetection !== 'undefined') {
+                    try {
+                        log('Trying MediaPipe...');
+                        this.detector = new FaceDetection({
+                            locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${f}`
+                        });
+                        this.detector.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
+                        this.detector.onResults(r => this.onFace(r));
+                        stat('sTrack', 'MediaPipe', 'ok');
+                        log('MediaPipe ready');
+                        this.runDetection();
+                        return;
+                    } catch (err) {
+                        log(`MediaPipe failed: ${err.message}`, 'w');
+                    }
                 }
                 
-                try {
-                    log('Creating MediaPipe FaceDetection...');
-                    
-                    this.faceDetector = new FaceDetection({
-                        locateFile: (file) => {
-                            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`;
-                        }
-                    });
-                    
-                    this.faceDetector.setOptions({
-                        model: 'short',
-                        minDetectionConfidence: 0.5
-                    });
-                    
-                    this.faceDetector.onResults((results) => {
-                        this.onFaceResults(results);
-                    });
-                    
-                    log('MediaPipe configured ✓', 's');
-                    stat('sMod', 'MP', '#0f0');
-                    
-                    // Start detection loop
-                    this.detectLoop();
-                    
-                } catch (err) {
-                    log(`MediaPipe error: ${err.message}`, 'e');
-                    log('Trying alternative method...', 'w');
-                    await this.setupFaceDetectionAlt();
-                }
-            }
-            
-            async setupFaceDetectionAlt() {
-                // Try native FaceDetector API (Chrome 94+)
+                // Try Native
                 if ('FaceDetector' in window) {
                     try {
-                        log('Trying native FaceDetector API...', 'w');
-                        this.nativeFaceDetector = new window.FaceDetector({
-                            fastMode: true,
-                            maxDetectedFaces: 1
-                        });
-                        stat('sMod', 'Native', '#0f0');
-                        log('Native FaceDetector ready ✓', 's');
-                        this.detectLoopNative();
+                        log('Trying Native...');
+                        this.nativeDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+                        stat('sTrack', 'Native', 'ok');
+                        log('Native ready');
+                        this.runNative();
                         return;
-                    } catch (e) {
-                        log(`Native API failed: ${e.message}`, 'e');
+                    } catch (err) {
+                        log(`Native failed: ${err.message}`, 'w');
                     }
                 }
                 
-                // Final fallback - simple motion-based tracking
-                log('Using simple tracking fallback', 'w');
-                stat('sMod', 'Simple', '#fa0');
-                this.detectLoopSimple();
+                // Simple fallback
+                stat('sTrack', 'Simple', 'w');
+                log('Using simple tracking', 'w');
+                this.runSimple();
             }
             
-            detectLoop() {
-                const detect = async () => {
-                    if (!this.faceDetector || this.vid.readyState < 2) {
-                        requestAnimationFrame(detect);
-                        return;
+            runDetection() {
+                const run = async () => {
+                    if (this.detector && this.vid.readyState >= 2) {
+                        try {
+                            await this.detector.send({ image: this.vid });
+                        } catch (e) {}
                     }
-                    
-                    try {
-                        await this.faceDetector.send({ image: this.vid });
-                    } catch (e) {
-                        // Silently continue
-                    }
-                    
-                    requestAnimationFrame(detect);
+                    requestAnimationFrame(run);
                 };
-                detect();
+                run();
             }
             
-            async detectLoopNative() {
-                const detect = async () => {
-                    if (!this.nativeFaceDetector || this.vid.readyState < 2) {
-                        requestAnimationFrame(detect);
-                        return;
+            runNative() {
+                const run = async () => {
+                    if (this.nativeDetector && this.vid.readyState >= 2) {
+                        try {
+                            const faces = await this.nativeDetector.detect(this.vid);
+                            this.processNative(faces);
+                        } catch (e) {}
                     }
-                    
-                    try {
-                        const faces = await this.nativeFaceDetector.detect(this.vid);
-                        this.processNativeFaces(faces);
-                    } catch (e) {
-                        // Silently continue
-                    }
-                    
-                    requestAnimationFrame(detect);
+                    requestAnimationFrame(run);
                 };
-                detect();
+                run();
             }
             
-            detectLoopSimple() {
-                // Canvas-based brightness tracking as ultimate fallback
-                let prevBrightness = null;
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = 64;
-                tempCanvas.height = 48;
-                const tempCtx = tempCanvas.getContext('2d');
+            runSimple() {
+                const tmp = document.createElement('canvas');
+                tmp.width = 64; tmp.height = 48;
+                const tc = tmp.getContext('2d');
                 
-                const detect = () => {
-                    if (this.vid.readyState < 2) {
-                        requestAnimationFrame(detect);
-                        return;
-                    }
-                    
-                    // Sample video into small canvas
-                    tempCtx.drawImage(this.vid, 0, 0, 64, 48);
-                    const data = tempCtx.getImageData(0, 0, 64, 48).data;
-                    
-                    // Find brightest region (likely face)
-                    let maxBright = 0;
-                    let brightX = 32, brightY = 24;
-                    
-                    for (let y = 8; y < 40; y += 4) {
-                        for (let x = 8; x < 56; x += 4) {
-                            const i = (y * 64 + x) * 4;
-                            const bright = data[i] + data[i+1] + data[i+2];
-                            if (bright > maxBright) {
-                                maxBright = bright;
-                                brightX = x;
-                                brightY = y;
+                const run = () => {
+                    if (this.vid.readyState >= 2) {
+                        tc.drawImage(this.vid, 0, 0, 64, 48);
+                        const d = tc.getImageData(0, 0, 64, 48).data;
+                        
+                        let maxB = 0, bx = 32, by = 24;
+                        for (let y = 10; y < 38; y += 3) {
+                            for (let x = 16; x < 48; x += 3) {
+                                const i = (y * 64 + x) * 4;
+                                const b = d[i] + d[i+1] + d[i+2];
+                                if (b > maxB) { maxB = b; bx = x; by = y; }
                             }
                         }
-                    }
-                    
-                    if (maxBright > 200) {
-                        // Normalize to -1 to 1, flip X for mirror
-                        const nx = -((brightX / 64) - 0.5) * 2;
-                        const ny = ((brightY / 48) - 0.5) * 2;
                         
-                        this.face.x = nx * 150;
-                        this.face.y = -ny * 100;
-                        
-                        this.tracking = true;
-                        $('trackDot').classList.add('on');
-                        stat('sFace', 'YES', '#0f0');
-                        
-                        // Draw indicator
-                        if (this.ctx) {
-                            this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
-                            this.ctx.save();
-                            this.ctx.translate(this.ovr.width, 0);
-                            this.ctx.scale(-1, 1);
-                            
-                            const dx = (brightX / 64) * this.ovr.width;
-                            const dy = (brightY / 48) * this.ovr.height;
-                            
-                            this.ctx.beginPath();
-                            this.ctx.arc(dx, dy, 15, 0, Math.PI * 2);
-                            this.ctx.strokeStyle = '#ff6600';
-                            this.ctx.lineWidth = 3;
-                            this.ctx.stroke();
-                            this.ctx.restore();
+                        if (maxB > 250) {
+                            this.face.x = -(((bx/64) - 0.5) * 2) * 250;
+                            this.face.y = -(((by/48) - 0.5) * 2) * 180;
+                            this.tracking = true;
+                            $('dot').classList.add('on');
+                            stat('sFace', 'YES', 'ok');
+                            this.drawDot(bx/64, by/48);
+                        } else {
+                            this.tracking = false;
+                            $('dot').classList.remove('on');
+                            stat('sFace', 'NO', 'err');
                         }
-                    } else {
-                        this.tracking = false;
-                        $('trackDot').classList.remove('on');
-                        stat('sFace', 'NO', '#f55');
+                        stat('sX', this.face.x.toFixed(0));
+                        stat('sY', this.face.y.toFixed(0));
                     }
-                    
-                    stat('sX', this.face.x.toFixed(0));
-                    stat('sY', this.face.y.toFixed(0));
-                    
-                    requestAnimationFrame(detect);
+                    requestAnimationFrame(run);
                 };
-                
-                detect();
-                log('Simple tracking started ✓', 's');
+                run();
             }
             
-            onFaceResults(results) {
-                if (this.ctx) {
-                    this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
-                }
+            onFace(results) {
+                if (this.ctx) this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
                 
                 if (results.detections && results.detections.length > 0) {
-                    const detection = results.detections[0];
-                    const box = detection.boundingBox;
+                    this.faceCount++;
+                    const b = results.detections[0].boundingBox;
                     
-                    // Draw face box
-                    if (this.ctx) {
-                        this.ctx.save();
-                        this.ctx.translate(this.ovr.width, 0);
-                        this.ctx.scale(-1, 1);
-                        
-                        const x = box.xCenter * this.ovr.width;
-                        const y = box.yCenter * this.ovr.height;
-                        const w = box.width * this.ovr.width;
-                        const h = box.height * this.ovr.height;
-                        
-                        this.ctx.strokeStyle = '#ff6600';
-                        this.ctx.lineWidth = 2;
-                        this.ctx.strokeRect(x - w/2, y - h/2, w, h);
-                        
-                        // Center dot
-                        this.ctx.beginPath();
-                        this.ctx.arc(x, y, 6, 0, Math.PI * 2);
-                        this.ctx.fillStyle = '#ff6600';
-                        this.ctx.fill();
-                        
-                        this.ctx.restore();
-                    }
+                    this.drawBox(b.xCenter, b.yCenter, b.width, b.height);
                     
-                    // Calculate face position
-                    const nx = -(box.xCenter - 0.5) * 2;
-                    const ny = (box.yCenter - 0.5) * 2;
+                    this.face.x = -(b.xCenter - 0.5) * 2 * 250;
+                    this.face.y = -(b.yCenter - 0.5) * 2 * 180;
                     
-                    this.face.x = nx * 180;
-                    this.face.y = -ny * 140;
-                    
-                    // Depth from face size
-                    const faceSize = Math.max(box.width, box.height);
-                    this.face.z = Math.max(250, Math.min(800, 400 / Math.max(0.1, faceSize)));
+                    const fSize = Math.max(b.width, b.height);
+                    this.face.z = Math.max(200, Math.min(700, 350 / Math.max(0.15, fSize)));
                     
                     this.tracking = true;
-                    $('trackDot').classList.add('on');
-                    stat('sFace', 'YES', '#0f0');
+                    $('dot').classList.add('on');
+                    stat('sFace', `#${this.faceCount}`, 'ok');
                 } else {
                     this.tracking = false;
-                    $('trackDot').classList.remove('on');
-                    stat('sFace', 'NO', '#f55');
+                    $('dot').classList.remove('on');
+                    stat('sFace', 'NO', 'err');
                 }
-                
                 stat('sX', this.face.x.toFixed(0));
                 stat('sY', this.face.y.toFixed(0));
             }
             
-            processNativeFaces(faces) {
-                if (this.ctx) {
-                    this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
-                }
+            processNative(faces) {
+                if (this.ctx) this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
                 
                 if (faces.length > 0) {
-                    const face = faces[0];
-                    const box = face.boundingBox;
+                    this.faceCount++;
+                    const f = faces[0].boundingBox;
+                    const cx = (f.x + f.width/2) / this.vid.videoWidth;
+                    const cy = (f.y + f.height/2) / this.vid.videoHeight;
                     
-                    // Draw
-                    if (this.ctx) {
-                        this.ctx.save();
-                        this.ctx.translate(this.ovr.width, 0);
-                        this.ctx.scale(-1, 1);
-                        
-                        this.ctx.strokeStyle = '#ff6600';
-                        this.ctx.lineWidth = 2;
-                        this.ctx.strokeRect(box.x, box.y, box.width, box.height);
-                        
-                        const cx = box.x + box.width/2;
-                        const cy = box.y + box.height/2;
-                        this.ctx.beginPath();
-                        this.ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-                        this.ctx.fillStyle = '#ff6600';
-                        this.ctx.fill();
-                        
-                        this.ctx.restore();
-                    }
+                    this.drawBox(cx, cy, f.width/this.vid.videoWidth, f.height/this.vid.videoHeight);
                     
-                    const cx = (box.x + box.width/2) / this.vid.videoWidth;
-                    const cy = (box.y + box.height/2) / this.vid.videoHeight;
-                    
-                    const nx = -(cx - 0.5) * 2;
-                    const ny = (cy - 0.5) * 2;
-                    
-                    this.face.x = nx * 180;
-                    this.face.y = -ny * 140;
+                    this.face.x = -(cx - 0.5) * 2 * 250;
+                    this.face.y = -(cy - 0.5) * 2 * 180;
                     
                     this.tracking = true;
-                    $('trackDot').classList.add('on');
-                    stat('sFace', 'YES', '#0f0');
+                    $('dot').classList.add('on');
+                    stat('sFace', `#${this.faceCount}`, 'ok');
                 } else {
                     this.tracking = false;
-                    $('trackDot').classList.remove('on');
-                    stat('sFace', 'NO', '#f55');
+                    $('dot').classList.remove('on');
+                    stat('sFace', 'NO', 'err');
                 }
-                
                 stat('sX', this.face.x.toFixed(0));
                 stat('sY', this.face.y.toFixed(0));
+            }
+            
+            drawBox(cx, cy, w, h) {
+                if (!this.ctx) return;
+                const c = this.ctx, ow = this.ovr.width, oh = this.ovr.height;
+                c.save();
+                c.translate(ow, 0);
+                c.scale(-1, 1);
+                
+                const x = cx * ow, y = cy * oh;
+                c.strokeStyle = '#ff6600';
+                c.lineWidth = 2;
+                c.strokeRect(x - (w*ow)/2, y - (h*oh)/2, w*ow, h*oh);
+                
+                c.beginPath();
+                c.arc(x, y, 5, 0, Math.PI*2);
+                c.fillStyle = '#ff6600';
+                c.fill();
+                
+                c.restore();
+            }
+            
+            drawDot(nx, ny) {
+                if (!this.ctx) return;
+                const c = this.ctx;
+                c.clearRect(0, 0, this.ovr.width, this.ovr.height);
+                c.save();
+                c.translate(this.ovr.width, 0);
+                c.scale(-1, 1);
+                c.beginPath();
+                c.arc(nx * this.ovr.width, ny * this.ovr.height, 10, 0, Math.PI*2);
+                c.strokeStyle = '#ff6600';
+                c.lineWidth = 2;
+                c.stroke();
+                c.restore();
             }
             
             setupUI() {
+                // Object buttons
                 document.querySelectorAll('.ob').forEach(b => {
                     b.onclick = () => {
                         document.querySelectorAll('.ob').forEach(x => x.classList.remove('on'));
@@ -611,22 +858,46 @@
                     };
                 });
                 
+                // Upload
+                $('uploadBtn').onclick = () => {
+                    log('Upload clicked');
+                    $('fileInput').click();
+                };
+                
+                $('fileInput').onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
+                        this.loadSTL(file);
+                    }
+                    e.target.value = '';
+                };
+                
+                // Clear model
+                $('clearModel').onclick = () => {
+                    this.makeObj('sneaker');
+                    document.querySelector('.ob[data-o="sneaker"]').classList.add('on');
+                };
+                
+                // Resize
                 window.addEventListener('resize', () => {
                     this.camera.aspect = innerWidth / innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(innerWidth, innerHeight);
                 });
+                
+                log('UI ready');
             }
             
             updateProjection() {
-                this.smooth.x += (this.face.x - this.smooth.x) * 0.12;
-                this.smooth.y += (this.face.y - this.smooth.y) * 0.12;
-                this.smooth.z += (this.face.z - this.smooth.z) * 0.12;
+                this.smooth.x += (this.face.x - this.smooth.x) * 0.1;
+                this.smooth.y += (this.face.y - this.smooth.y) * 0.1;
+                this.smooth.z += (this.face.z - this.smooth.z) * 0.1;
                 
                 const { x, y, z } = this.smooth;
                 const asp = innerWidth / innerHeight;
-                const hw = 150, hh = hw / asp;
-                const n = 10, f = 2500, r = n / z;
+                const hw = 180, hh = hw / asp;
+                const n = 10, f = 3000, r = n / z;
                 
                 this.camera.projectionMatrix.makePerspective(
                     (-hw - x) * r, (hw - x) * r,
@@ -635,12 +906,22 @@
                 );
                 this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
                 this.camera.position.set(x, y, z);
-                this.camera.lookAt(x, y, 0);
+                this.camera.lookAt(x, y, -200);
             }
             
             animate() {
                 requestAnimationFrame(() => this.animate());
                 this.updateProjection();
+                
+                // Animate gem
+                if (this.obj && this.obj.children) {
+                    this.obj.children.forEach(c => {
+                        if (c.userData && c.userData.spd) {
+                            c.rotation.z += c.userData.spd;
+                        }
+                    });
+                }
+                
                 this.renderer.render(this.scene, this.camera);
             }
         }
