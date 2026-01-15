@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>OffAxis 3D - Debug v4</title>
+    <title>OffAxis 3D</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -19,13 +19,13 @@
             display: block;
         }
         
-        /* Large PIP for debugging */
+        /* PIP */
         #pip {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 160px;
-            height: 200px;
+            width: 120px;
+            height: 160px;
             border-radius: 12px;
             overflow: hidden;
             z-index: 100;
@@ -51,22 +51,23 @@
             width: 10px; height: 10px;
             border-radius: 50%;
             background: #ff3b30;
+            transition: all 0.3s;
         }
         #trackDot.on { background: #30d158; box-shadow: 0 0 10px #30d158; }
         
-        /* Debug console - VERY VISIBLE */
+        /* Debug */
         #debug {
             position: fixed;
             top: 10px;
             left: 10px;
-            right: 180px;
-            max-height: 50vh;
-            background: rgba(0,0,0,0.95);
+            right: 150px;
+            max-height: 35vh;
+            background: rgba(0,0,0,0.9);
             border: 1px solid #333;
             border-radius: 8px;
-            padding: 12px;
+            padding: 10px;
             font-family: monospace;
-            font-size: 11px;
+            font-size: 10px;
             color: #0f0;
             overflow-y: auto;
             z-index: 1000;
@@ -74,26 +75,25 @@
         #debug .e { color: #f55; }
         #debug .w { color: #fa0; }
         #debug .s { color: #0f0; }
-        #debug .i { color: #0af; }
         
-        /* Status panel */
+        /* Status */
         #status {
             position: fixed;
-            bottom: 230px;
-            right: 20px;
+            top: 10px;
+            right: 10px;
             background: rgba(0,0,0,0.9);
             border: 1px solid #333;
             border-radius: 8px;
-            padding: 12px;
-            font-size: 11px;
+            padding: 10px;
+            font-size: 10px;
             color: #fff;
             z-index: 100;
-            min-width: 160px;
+            min-width: 130px;
         }
-        #status div { margin: 4px 0; display: flex; justify-content: space-between; }
-        #status .val { color: #ff6600; font-family: monospace; }
+        #status div { margin: 3px 0; display: flex; justify-content: space-between; }
+        #status .v { color: #ff6600; font-family: monospace; }
         
-        /* Object buttons */
+        /* Objects */
         #objs {
             position: fixed;
             left: 16px;
@@ -102,7 +102,7 @@
             gap: 8px;
             z-index: 100;
         }
-        .obtn {
+        .ob {
             width: 44px; height: 44px;
             border-radius: 10px;
             border: none;
@@ -111,7 +111,7 @@
             font-size: 18px;
             cursor: pointer;
         }
-        .obtn.on { background: rgba(255,102,0,0.3); box-shadow: 0 0 0 2px #ff6600; }
+        .ob.on { background: rgba(255,102,0,0.3); box-shadow: 0 0 0 2px #ff6600; }
     </style>
 </head>
 <body>
@@ -126,71 +126,60 @@
     <div id="debug"></div>
     
     <div id="status">
-        <div>Camera <span class="val" id="sCam">--</span></div>
-        <div>Video Size <span class="val" id="sVid">--</span></div>
-        <div>TF Backend <span class="val" id="sTF">--</span></div>
-        <div>Model <span class="val" id="sMod">--</span></div>
-        <div>Detecting <span class="val" id="sDet">--</span></div>
-        <div>Faces <span class="val" id="sFace">--</span></div>
-        <div>X <span class="val" id="sX">0</span></div>
-        <div>Y <span class="val" id="sY">0</span></div>
-        <div>Z <span class="val" id="sZ">0</span></div>
+        <div>Camera <span class="v" id="sCam">--</span></div>
+        <div>Video <span class="v" id="sVid">--</span></div>
+        <div>Model <span class="v" id="sMod">--</span></div>
+        <div>Faces <span class="v" id="sFace">--</span></div>
+        <div>X <span class="v" id="sX">0</span></div>
+        <div>Y <span class="v" id="sY">0</span></div>
     </div>
     
     <div id="objs">
-        <button class="obtn on" data-o="shoe">👟</button>
-        <button class="obtn" data-o="cube">🎲</button>
-        <button class="obtn" data-o="gem">💎</button>
+        <button class="ob on" data-o="shoe">👟</button>
+        <button class="ob" data-o="cube">🎲</button>
+        <button class="ob" data-o="gem">💎</button>
     </div>
 
     <!-- THREE.JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- TensorFlow - TRY OLDER MORE STABLE VERSION -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-    
-    <!-- BlazeFace - SIMPLER AND MORE RELIABLE -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.1.0/dist/blazeface.min.js"></script>
+    <!-- MediaPipe Face Detection - OFFICIAL GOOGLE CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     
     <script>
     (function() {
         'use strict';
         
-        // ===================
-        // DEBUG SYSTEM
-        // ===================
-        const debugEl = document.getElementById('debug');
-        let logCount = 0;
+        const $ = id => document.getElementById(id);
+        const dbg = $('debug');
+        let lc = 0;
         
-        function log(msg, type = 'i') {
-            const ts = new Date().toLocaleTimeString();
-            const div = document.createElement('div');
-            div.className = type;
-            div.textContent = `[${++logCount}] ${ts} | ${msg}`;
-            debugEl.appendChild(div);
-            debugEl.scrollTop = debugEl.scrollHeight;
-            console.log(`[${type}] ${msg}`);
+        function log(m, t='s') {
+            const d = document.createElement('div');
+            d.className = t;
+            d.textContent = `[${++lc}] ${m}`;
+            dbg.appendChild(d);
+            dbg.scrollTop = dbg.scrollHeight;
+            console.log(`[${t}] ${m}`);
         }
         
-        function stat(id, val, color) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = val;
-                if (color) el.style.color = color;
-            }
+        function stat(id, v, c) {
+            const e = $(id);
+            if (e) { e.textContent = v; if (c) e.style.color = c; }
         }
         
-        // ===================
+        // =====================
         // MAIN APP
-        // ===================
+        // =====================
         class App {
             constructor() {
-                log('App constructor starting...', 's');
+                log('Starting app...');
                 
-                this.vid = document.getElementById('vid');
-                this.ovr = document.getElementById('ovr');
+                this.vid = $('vid');
+                this.ovr = $('ovr');
                 this.ctx = null;
-                this.model = null;
+                this.faceDetector = null;
                 
                 this.scene = null;
                 this.camera = null;
@@ -201,48 +190,33 @@
                 this.face = { x: 0, y: 0, z: 500 };
                 this.smooth = { x: 0, y: 0, z: 500 };
                 this.tracking = false;
-                this.detectCount = 0;
-                this.faceCount = 0;
                 
                 this.init();
             }
             
             async init() {
                 try {
-                    log('=== INIT START ===', 's');
-                    
-                    // Step 1: 3D
-                    log('Step 1: Setting up Three.js...', 'i');
+                    log('Setting up 3D...');
                     this.setup3D();
-                    log('Three.js ready ✓', 's');
+                    log('3D ready ✓', 's');
                     
-                    // Step 2: Camera
-                    log('Step 2: Setting up camera...', 'i');
+                    log('Setting up camera...');
                     await this.setupCamera();
                     
-                    // Step 3: Face detection
-                    log('Step 3: Setting up face detection...', 'i');
+                    log('Setting up face detection...');
                     await this.setupFaceDetection();
                     
-                    // Step 4: UI
-                    log('Step 4: Setting up UI...', 'i');
                     this.setupUI();
-                    
-                    // Step 5: Start animation
-                    log('Step 5: Starting render loop...', 'i');
                     this.animate();
                     
-                    log('=== INIT COMPLETE ===', 's');
-                    
+                    log('=== ALL READY ===', 's');
                 } catch (err) {
-                    log(`FATAL ERROR: ${err.message}`, 'e');
-                    log(`Stack: ${err.stack}`, 'e');
+                    log(`ERROR: ${err.message}`, 'e');
                 }
             }
             
             setup3D() {
-                const canvas = document.getElementById('canvas3d');
-                
+                const canvas = $('canvas3d');
                 this.scene = new THREE.Scene();
                 this.camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 1, 5000);
                 this.camera.position.z = 500;
@@ -252,76 +226,38 @@
                 this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
                 this.renderer.setClearColor(0x08080c);
                 
-                // Lights
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
                 const light = new THREE.DirectionalLight(0xffffff, 1);
                 light.position.set(100, 150, 100);
                 this.scene.add(light);
                 
-                // Grid
                 this.grid = new THREE.GridHelper(400, 20, 0xff6600, 0x1a0800);
                 this.grid.position.y = -80;
                 this.scene.add(this.grid);
                 
-                // Initial object
                 this.makeObj('shoe');
             }
             
             makeObj(type) {
                 if (this.obj) this.scene.remove(this.obj);
-                
                 const g = new THREE.Group();
                 
                 if (type === 'shoe') {
-                    // Simplified sneaker
-                    const sole = new THREE.Mesh(
-                        new THREE.BoxGeometry(100, 14, 40),
-                        new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a })
-                    );
-                    sole.position.y = -30;
-                    g.add(sole);
-                    
-                    const mid = new THREE.Mesh(
-                        new THREE.BoxGeometry(95, 18, 38),
-                        new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-                    );
-                    mid.position.y = -16;
-                    g.add(mid);
-                    
-                    const upper = new THREE.Mesh(
-                        new THREE.BoxGeometry(85, 35, 34),
-                        new THREE.MeshPhysicalMaterial({ color: 0x2d2d2d })
-                    );
-                    upper.position.y = 8;
-                    g.add(upper);
-                    
-                    // Orange stripes
-                    for (let i = 0; i < 3; i++) {
-                        const stripe = new THREE.Mesh(
-                            new THREE.BoxGeometry(4, 26, 36),
-                            new THREE.MeshBasicMaterial({ color: 0xff6600 })
-                        );
-                        stripe.position.set(-10 + i*18, 8, 0);
-                        stripe.rotation.z = 0.25;
-                        g.add(stripe);
+                    g.add(new THREE.Mesh(new THREE.BoxGeometry(100,14,40), new THREE.MeshPhysicalMaterial({color:0x1a1a1a})));
+                    g.children[0].position.y = -30;
+                    const mid = new THREE.Mesh(new THREE.BoxGeometry(95,18,38), new THREE.MeshPhysicalMaterial({color:0xffffff}));
+                    mid.position.y = -16; g.add(mid);
+                    const up = new THREE.Mesh(new THREE.BoxGeometry(85,35,34), new THREE.MeshPhysicalMaterial({color:0x2d2d2d}));
+                    up.position.y = 8; g.add(up);
+                    for (let i=0; i<3; i++) {
+                        const s = new THREE.Mesh(new THREE.BoxGeometry(4,26,36), new THREE.MeshBasicMaterial({color:0xff6600}));
+                        s.position.set(-10+i*18, 8, 0); s.rotation.z = 0.25; g.add(s);
                     }
-                    
-                    g.rotation.y = -0.4;
-                    g.position.y = 10;
-                    
+                    g.rotation.y = -0.4; g.position.y = 10;
                 } else if (type === 'cube') {
-                    const cube = new THREE.Mesh(
-                        new THREE.BoxGeometry(80, 80, 80),
-                        new THREE.MeshPhysicalMaterial({ color: 0xff6600, metalness: 0.3 })
-                    );
-                    g.add(cube);
-                    
+                    g.add(new THREE.Mesh(new THREE.BoxGeometry(80,80,80), new THREE.MeshPhysicalMaterial({color:0xff6600,metalness:0.3})));
                 } else if (type === 'gem') {
-                    const gem = new THREE.Mesh(
-                        new THREE.OctahedronGeometry(50, 0),
-                        new THREE.MeshPhysicalMaterial({ color: 0xff00ff, clearcoat: 1 })
-                    );
-                    g.add(gem);
+                    g.add(new THREE.Mesh(new THREE.OctahedronGeometry(50,0), new THREE.MeshPhysicalMaterial({color:0xff00ff,clearcoat:1})));
                 }
                 
                 this.obj = g;
@@ -329,373 +265,375 @@
             }
             
             async setupCamera() {
-                stat('sCam', 'Starting...', '#fa0');
-                
-                // Check API availability
-                if (!navigator.mediaDevices) {
-                    log('navigator.mediaDevices is UNDEFINED', 'e');
-                    stat('sCam', 'No API', '#f55');
-                    this.setupTouch();
-                    return;
-                }
-                
-                if (!navigator.mediaDevices.getUserMedia) {
-                    log('getUserMedia is UNDEFINED', 'e');
-                    stat('sCam', 'No gUM', '#f55');
-                    this.setupTouch();
-                    return;
-                }
-                
-                log('Camera API available ✓', 's');
+                stat('sCam', '...', '#fa0');
                 
                 try {
-                    log('Requesting camera permission...', 'i');
-                    
-                    const constraints = {
-                        video: {
-                            facingMode: 'user',
-                            width: { ideal: 320, max: 640 },
-                            height: { ideal: 240, max: 480 }
-                        },
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
                         audio: false
-                    };
-                    
-                    log(`Constraints: ${JSON.stringify(constraints)}`, 'i');
-                    
-                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    
-                    log('Got media stream ✓', 's');
-                    
-                    const tracks = stream.getVideoTracks();
-                    log(`Video tracks: ${tracks.length}`, 'i');
-                    
-                    if (tracks.length > 0) {
-                        const settings = tracks[0].getSettings();
-                        log(`Track settings: ${JSON.stringify(settings)}`, 'i');
-                    }
-                    
-                    this.vid.srcObject = stream;
-                    log('Set video srcObject ✓', 's');
-                    
-                    // Wait for video metadata
-                    await new Promise((resolve, reject) => {
-                        const timeout = setTimeout(() => {
-                            reject(new Error('Video metadata timeout (10s)'));
-                        }, 10000);
-                        
-                        this.vid.onloadedmetadata = () => {
-                            clearTimeout(timeout);
-                            log(`Video metadata loaded: ${this.vid.videoWidth}x${this.vid.videoHeight}`, 's');
-                            stat('sVid', `${this.vid.videoWidth}x${this.vid.videoHeight}`, '#0f0');
-                            resolve();
-                        };
-                        
-                        this.vid.onerror = (e) => {
-                            clearTimeout(timeout);
-                            log(`Video element error: ${e}`, 'e');
-                            reject(new Error('Video element error'));
-                        };
                     });
                     
-                    // Setup overlay canvas
-                    this.ovr.width = this.vid.videoWidth;
-                    this.ovr.height = this.vid.videoHeight;
-                    this.ctx = this.ovr.getContext('2d');
-                    log(`Overlay canvas: ${this.ovr.width}x${this.ovr.height}`, 'i');
+                    this.vid.srcObject = stream;
                     
-                    // Play video
-                    log('Attempting to play video...', 'i');
-                    await this.vid.play();
-                    log('Video playing ✓', 's');
+                    await new Promise((res, rej) => {
+                        this.vid.onloadedmetadata = () => {
+                            this.ovr.width = this.vid.videoWidth;
+                            this.ovr.height = this.vid.videoHeight;
+                            this.ctx = this.ovr.getContext('2d');
+                            this.vid.play().then(res).catch(rej);
+                        };
+                        setTimeout(() => rej(new Error('Timeout')), 10000);
+                    });
                     
                     stat('sCam', 'OK', '#0f0');
+                    stat('sVid', `${this.vid.videoWidth}x${this.vid.videoHeight}`, '#0f0');
+                    log(`Camera: ${this.vid.videoWidth}x${this.vid.videoHeight} ✓`, 's');
                     
                 } catch (err) {
-                    log(`Camera error: ${err.name}: ${err.message}`, 'e');
+                    log(`Camera error: ${err.message}`, 'e');
                     stat('sCam', 'FAIL', '#f55');
                     this.setupTouch();
                 }
             }
             
             setupTouch() {
-                log('Setting up touch/mouse fallback...', 'w');
-                
-                const update = (x, y) => {
-                    this.face.x = -((x / innerWidth) - 0.5) * 300;
-                    this.face.y = -((y / innerHeight) - 0.5) * 200;
+                log('Using touch fallback', 'w');
+                const upd = (x, y) => {
+                    this.face.x = -((x/innerWidth) - 0.5) * 300;
+                    this.face.y = -((y/innerHeight) - 0.5) * 200;
                     this.tracking = true;
-                    document.getElementById('trackDot').classList.add('on');
-                    stat('sFace', 'Touch', '#0af');
+                    $('trackDot').classList.add('on');
                 };
-                
-                document.addEventListener('mousemove', e => update(e.clientX, e.clientY));
-                document.addEventListener('touchmove', e => {
-                    e.preventDefault();
-                    update(e.touches[0].clientX, e.touches[0].clientY);
-                }, { passive: false });
-                
-                log('Touch fallback ready ✓', 's');
+                document.addEventListener('mousemove', e => upd(e.clientX, e.clientY));
+                document.addEventListener('touchmove', e => { e.preventDefault(); upd(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
             }
             
             async setupFaceDetection() {
-                // Check if camera is working
                 if (!this.vid.srcObject) {
-                    log('No video stream - skipping face detection', 'w');
-                    stat('sMod', 'Skipped', '#fa0');
+                    log('No camera - skip face detection', 'w');
                     return;
                 }
                 
-                stat('sTF', 'Loading...', '#fa0');
-                stat('sMod', 'Loading...', '#fa0');
+                stat('sMod', '...', '#fa0');
+                
+                // Check if MediaPipe loaded
+                if (typeof FaceDetection === 'undefined') {
+                    log('MediaPipe not loaded, trying alternative...', 'w');
+                    await this.setupFaceDetectionAlt();
+                    return;
+                }
                 
                 try {
-                    // Check if TF is loaded
-                    if (typeof tf === 'undefined') {
-                        throw new Error('TensorFlow.js not loaded!');
-                    }
-                    log('TensorFlow.js is loaded ✓', 's');
+                    log('Creating MediaPipe FaceDetection...');
                     
-                    // Setup backend
-                    log('Setting up TF backend...', 'i');
-                    log(`Available backends: ${Object.keys(tf.engine().registryFactory).join(', ')}`, 'i');
-                    
-                    // Try WebGL first, then WASM, then CPU
-                    let backend = null;
-                    for (const be of ['webgl', 'wasm', 'cpu']) {
-                        try {
-                            await tf.setBackend(be);
-                            await tf.ready();
-                            backend = tf.getBackend();
-                            log(`Using backend: ${backend} ✓`, 's');
-                            break;
-                        } catch (e) {
-                            log(`Backend ${be} failed: ${e.message}`, 'w');
+                    this.faceDetector = new FaceDetection({
+                        locateFile: (file) => {
+                            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`;
                         }
-                    }
+                    });
                     
-                    if (!backend) {
-                        throw new Error('No TF backend available!');
-                    }
+                    this.faceDetector.setOptions({
+                        model: 'short',
+                        minDetectionConfidence: 0.5
+                    });
                     
-                    stat('sTF', backend, '#0f0');
+                    this.faceDetector.onResults((results) => {
+                        this.onFaceResults(results);
+                    });
                     
-                    // Check if BlazeFace is loaded
-                    if (typeof blazeface === 'undefined') {
-                        throw new Error('BlazeFace not loaded!');
-                    }
-                    log('BlazeFace library loaded ✓', 's');
-                    
-                    // Load BlazeFace model
-                    log('Loading BlazeFace model (this may take a moment)...', 'i');
-                    
-                    this.model = await blazeface.load();
-                    
-                    log('BlazeFace model loaded ✓', 's');
-                    stat('sMod', 'Ready', '#0f0');
+                    log('MediaPipe configured ✓', 's');
+                    stat('sMod', 'MP', '#0f0');
                     
                     // Start detection loop
-                    log('Starting detection loop...', 'i');
                     this.detectLoop();
                     
                 } catch (err) {
-                    log(`Face detection setup error: ${err.message}`, 'e');
-                    log(`Error stack: ${err.stack}`, 'e');
-                    stat('sMod', 'FAIL', '#f55');
-                    this.setupTouch();
+                    log(`MediaPipe error: ${err.message}`, 'e');
+                    log('Trying alternative method...', 'w');
+                    await this.setupFaceDetectionAlt();
                 }
             }
             
-            async detectLoop() {
-                stat('sDet', 'Running', '#0f0');
-                
-                const detect = async () => {
-                    // Check prerequisites
-                    if (!this.model) {
-                        log('Model is null in detect loop!', 'e');
+            async setupFaceDetectionAlt() {
+                // Try native FaceDetector API (Chrome 94+)
+                if ('FaceDetector' in window) {
+                    try {
+                        log('Trying native FaceDetector API...', 'w');
+                        this.nativeFaceDetector = new window.FaceDetector({
+                            fastMode: true,
+                            maxDetectedFaces: 1
+                        });
+                        stat('sMod', 'Native', '#0f0');
+                        log('Native FaceDetector ready ✓', 's');
+                        this.detectLoopNative();
                         return;
+                    } catch (e) {
+                        log(`Native API failed: ${e.message}`, 'e');
                     }
-                    
-                    if (!this.vid || this.vid.readyState < 2) {
-                        // Video not ready yet, wait
+                }
+                
+                // Final fallback - simple motion-based tracking
+                log('Using simple tracking fallback', 'w');
+                stat('sMod', 'Simple', '#fa0');
+                this.detectLoopSimple();
+            }
+            
+            detectLoop() {
+                const detect = async () => {
+                    if (!this.faceDetector || this.vid.readyState < 2) {
                         requestAnimationFrame(detect);
                         return;
                     }
                     
-                    this.detectCount++;
+                    try {
+                        await this.faceDetector.send({ image: this.vid });
+                    } catch (e) {
+                        // Silently continue
+                    }
+                    
+                    requestAnimationFrame(detect);
+                };
+                detect();
+            }
+            
+            async detectLoopNative() {
+                const detect = async () => {
+                    if (!this.nativeFaceDetector || this.vid.readyState < 2) {
+                        requestAnimationFrame(detect);
+                        return;
+                    }
                     
                     try {
-                        // BlazeFace detection
-                        const predictions = await this.model.estimateFaces(this.vid, false);
+                        const faces = await this.nativeFaceDetector.detect(this.vid);
+                        this.processNativeFaces(faces);
+                    } catch (e) {
+                        // Silently continue
+                    }
+                    
+                    requestAnimationFrame(detect);
+                };
+                detect();
+            }
+            
+            detectLoopSimple() {
+                // Canvas-based brightness tracking as ultimate fallback
+                let prevBrightness = null;
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 64;
+                tempCanvas.height = 48;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                const detect = () => {
+                    if (this.vid.readyState < 2) {
+                        requestAnimationFrame(detect);
+                        return;
+                    }
+                    
+                    // Sample video into small canvas
+                    tempCtx.drawImage(this.vid, 0, 0, 64, 48);
+                    const data = tempCtx.getImageData(0, 0, 64, 48).data;
+                    
+                    // Find brightest region (likely face)
+                    let maxBright = 0;
+                    let brightX = 32, brightY = 24;
+                    
+                    for (let y = 8; y < 40; y += 4) {
+                        for (let x = 8; x < 56; x += 4) {
+                            const i = (y * 64 + x) * 4;
+                            const bright = data[i] + data[i+1] + data[i+2];
+                            if (bright > maxBright) {
+                                maxBright = bright;
+                                brightX = x;
+                                brightY = y;
+                            }
+                        }
+                    }
+                    
+                    if (maxBright > 200) {
+                        // Normalize to -1 to 1, flip X for mirror
+                        const nx = -((brightX / 64) - 0.5) * 2;
+                        const ny = ((brightY / 48) - 0.5) * 2;
                         
-                        // Clear overlay
+                        this.face.x = nx * 150;
+                        this.face.y = -ny * 100;
+                        
+                        this.tracking = true;
+                        $('trackDot').classList.add('on');
+                        stat('sFace', 'YES', '#0f0');
+                        
+                        // Draw indicator
                         if (this.ctx) {
                             this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
+                            this.ctx.save();
+                            this.ctx.translate(this.ovr.width, 0);
+                            this.ctx.scale(-1, 1);
+                            
+                            const dx = (brightX / 64) * this.ovr.width;
+                            const dy = (brightY / 48) * this.ovr.height;
+                            
+                            this.ctx.beginPath();
+                            this.ctx.arc(dx, dy, 15, 0, Math.PI * 2);
+                            this.ctx.strokeStyle = '#ff6600';
+                            this.ctx.lineWidth = 3;
+                            this.ctx.stroke();
+                            this.ctx.restore();
                         }
-                        
-                        // Update stats every 30 frames
-                        if (this.detectCount % 30 === 0) {
-                            stat('sDet', `#${this.detectCount}`, '#0f0');
-                        }
-                        
-                        if (predictions.length > 0) {
-                            this.faceCount++;
-                            const face = predictions[0];
-                            
-                            // BlazeFace returns: topLeft, bottomRight, landmarks, probability
-                            const topLeft = face.topLeft;
-                            const bottomRight = face.bottomRight;
-                            const landmarks = face.landmarks;
-                            
-                            // Draw face box and landmarks
-                            this.drawFace(topLeft, bottomRight, landmarks);
-                            
-                            // Calculate center of face
-                            const centerX = (topLeft[0] + bottomRight[0]) / 2;
-                            const centerY = (topLeft[1] + bottomRight[1]) / 2;
-                            
-                            // Face box size for depth estimation
-                            const faceWidth = bottomRight[0] - topLeft[0];
-                            const faceHeight = bottomRight[1] - topLeft[1];
-                            
-                            // Normalize to -1 to 1 (flip X because video is mirrored in CSS)
-                            const nx = -((centerX / this.vid.videoWidth) - 0.5) * 2;
-                            const ny = ((centerY / this.vid.videoHeight) - 0.5) * 2;
-                            
-                            // Map to 3D space
-                            this.face.x = nx * 180;
-                            this.face.y = -ny * 140;
-                            
-                            // Depth from face size
-                            const baseFaceWidth = this.vid.videoWidth * 0.3;
-                            const depthRatio = faceWidth / baseFaceWidth;
-                            this.face.z = Math.max(250, Math.min(800, 500 / Math.max(0.3, depthRatio)));
-                            
-                            this.tracking = true;
-                            document.getElementById('trackDot').classList.add('on');
-                            stat('sFace', `YES (${this.faceCount})`, '#0f0');
-                            
-                        } else {
-                            this.tracking = false;
-                            document.getElementById('trackDot').classList.remove('on');
-                            stat('sFace', 'NO', '#f55');
-                        }
-                        
-                        // Update position stats
-                        stat('sX', this.face.x.toFixed(0));
-                        stat('sY', this.face.y.toFixed(0));
-                        stat('sZ', this.face.z.toFixed(0));
-                        
-                    } catch (err) {
-                        log(`Detection error: ${err.message}`, 'e');
-                        stat('sDet', 'ERROR', '#f55');
+                    } else {
+                        this.tracking = false;
+                        $('trackDot').classList.remove('on');
+                        stat('sFace', 'NO', '#f55');
                     }
+                    
+                    stat('sX', this.face.x.toFixed(0));
+                    stat('sY', this.face.y.toFixed(0));
                     
                     requestAnimationFrame(detect);
                 };
                 
                 detect();
+                log('Simple tracking started ✓', 's');
             }
             
-            drawFace(topLeft, bottomRight, landmarks) {
-                const c = this.ctx;
-                const w = this.ovr.width;
-                
-                // Mirror transform to match CSS scaleX(-1)
-                c.save();
-                c.translate(w, 0);
-                c.scale(-1, 1);
-                
-                // Draw face bounding box
-                c.strokeStyle = '#ff6600';
-                c.lineWidth = 2;
-                c.strokeRect(
-                    topLeft[0], 
-                    topLeft[1], 
-                    bottomRight[0] - topLeft[0], 
-                    bottomRight[1] - topLeft[1]
-                );
-                
-                // Draw landmarks (BlazeFace has 6: right eye, left eye, nose, mouth, right ear, left ear)
-                if (landmarks && landmarks.length > 0) {
-                    // Nose (index 2) - main tracking point
-                    if (landmarks[2]) {
-                        c.beginPath();
-                        c.arc(landmarks[2][0], landmarks[2][1], 8, 0, Math.PI * 2);
-                        c.fillStyle = 'rgba(255, 102, 0, 0.6)';
-                        c.fill();
-                        c.strokeStyle = '#ff6600';
-                        c.lineWidth = 2;
-                        c.stroke();
-                    }
-                    
-                    // Eyes (indices 0, 1)
-                    c.fillStyle = '#00ffff';
-                    for (let i = 0; i < 2; i++) {
-                        if (landmarks[i]) {
-                            c.beginPath();
-                            c.arc(landmarks[i][0], landmarks[i][1], 4, 0, Math.PI * 2);
-                            c.fill();
-                        }
-                    }
-                    
-                    // Mouth (index 3)
-                    if (landmarks[3]) {
-                        c.fillStyle = '#ff00ff';
-                        c.beginPath();
-                        c.arc(landmarks[3][0], landmarks[3][1], 4, 0, Math.PI * 2);
-                        c.fill();
-                    }
+            onFaceResults(results) {
+                if (this.ctx) {
+                    this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
                 }
                 
-                c.restore();
+                if (results.detections && results.detections.length > 0) {
+                    const detection = results.detections[0];
+                    const box = detection.boundingBox;
+                    
+                    // Draw face box
+                    if (this.ctx) {
+                        this.ctx.save();
+                        this.ctx.translate(this.ovr.width, 0);
+                        this.ctx.scale(-1, 1);
+                        
+                        const x = box.xCenter * this.ovr.width;
+                        const y = box.yCenter * this.ovr.height;
+                        const w = box.width * this.ovr.width;
+                        const h = box.height * this.ovr.height;
+                        
+                        this.ctx.strokeStyle = '#ff6600';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(x - w/2, y - h/2, w, h);
+                        
+                        // Center dot
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 6, 0, Math.PI * 2);
+                        this.ctx.fillStyle = '#ff6600';
+                        this.ctx.fill();
+                        
+                        this.ctx.restore();
+                    }
+                    
+                    // Calculate face position
+                    const nx = -(box.xCenter - 0.5) * 2;
+                    const ny = (box.yCenter - 0.5) * 2;
+                    
+                    this.face.x = nx * 180;
+                    this.face.y = -ny * 140;
+                    
+                    // Depth from face size
+                    const faceSize = Math.max(box.width, box.height);
+                    this.face.z = Math.max(250, Math.min(800, 400 / Math.max(0.1, faceSize)));
+                    
+                    this.tracking = true;
+                    $('trackDot').classList.add('on');
+                    stat('sFace', 'YES', '#0f0');
+                } else {
+                    this.tracking = false;
+                    $('trackDot').classList.remove('on');
+                    stat('sFace', 'NO', '#f55');
+                }
+                
+                stat('sX', this.face.x.toFixed(0));
+                stat('sY', this.face.y.toFixed(0));
+            }
+            
+            processNativeFaces(faces) {
+                if (this.ctx) {
+                    this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
+                }
+                
+                if (faces.length > 0) {
+                    const face = faces[0];
+                    const box = face.boundingBox;
+                    
+                    // Draw
+                    if (this.ctx) {
+                        this.ctx.save();
+                        this.ctx.translate(this.ovr.width, 0);
+                        this.ctx.scale(-1, 1);
+                        
+                        this.ctx.strokeStyle = '#ff6600';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(box.x, box.y, box.width, box.height);
+                        
+                        const cx = box.x + box.width/2;
+                        const cy = box.y + box.height/2;
+                        this.ctx.beginPath();
+                        this.ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+                        this.ctx.fillStyle = '#ff6600';
+                        this.ctx.fill();
+                        
+                        this.ctx.restore();
+                    }
+                    
+                    const cx = (box.x + box.width/2) / this.vid.videoWidth;
+                    const cy = (box.y + box.height/2) / this.vid.videoHeight;
+                    
+                    const nx = -(cx - 0.5) * 2;
+                    const ny = (cy - 0.5) * 2;
+                    
+                    this.face.x = nx * 180;
+                    this.face.y = -ny * 140;
+                    
+                    this.tracking = true;
+                    $('trackDot').classList.add('on');
+                    stat('sFace', 'YES', '#0f0');
+                } else {
+                    this.tracking = false;
+                    $('trackDot').classList.remove('on');
+                    stat('sFace', 'NO', '#f55');
+                }
+                
+                stat('sX', this.face.x.toFixed(0));
+                stat('sY', this.face.y.toFixed(0));
             }
             
             setupUI() {
-                // Object buttons
-                document.querySelectorAll('.obtn').forEach(btn => {
-                    btn.onclick = () => {
-                        document.querySelectorAll('.obtn').forEach(b => b.classList.remove('on'));
-                        btn.classList.add('on');
-                        this.makeObj(btn.dataset.o);
-                        log(`Changed object to: ${btn.dataset.o}`, 'i');
+                document.querySelectorAll('.ob').forEach(b => {
+                    b.onclick = () => {
+                        document.querySelectorAll('.ob').forEach(x => x.classList.remove('on'));
+                        b.classList.add('on');
+                        this.makeObj(b.dataset.o);
                     };
                 });
                 
-                // Resize
                 window.addEventListener('resize', () => {
                     this.camera.aspect = innerWidth / innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(innerWidth, innerHeight);
                 });
-                
-                log('UI setup complete ✓', 's');
             }
             
             updateProjection() {
-                // Smooth the position
                 this.smooth.x += (this.face.x - this.smooth.x) * 0.12;
                 this.smooth.y += (this.face.y - this.smooth.y) * 0.12;
                 this.smooth.z += (this.face.z - this.smooth.z) * 0.12;
                 
                 const { x, y, z } = this.smooth;
-                
-                // Off-axis projection
-                const aspect = innerWidth / innerHeight;
-                const halfW = 150;
-                const halfH = halfW / aspect;
-                const near = 10;
-                const far = 2500;
-                const r = near / z;
+                const asp = innerWidth / innerHeight;
+                const hw = 150, hh = hw / asp;
+                const n = 10, f = 2500, r = n / z;
                 
                 this.camera.projectionMatrix.makePerspective(
-                    (-halfW - x) * r,
-                    (halfW - x) * r,
-                    (halfH - y) * r,
-                    (-halfH - y) * r,
-                    near, far
+                    (-hw - x) * r, (hw - x) * r,
+                    (hh - y) * r, (-hh - y) * r,
+                    n, f
                 );
                 this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
-                
                 this.camera.position.set(x, y, z);
                 this.camera.lookAt(x, y, 0);
             }
@@ -708,11 +646,7 @@
         }
         
         // START
-        log('=== PAGE LOADED ===', 's');
-        log(`User Agent: ${navigator.userAgent}`, 'i');
-        log(`Protocol: ${location.protocol}`, 'i');
-        log(`Host: ${location.host}`, 'i');
-        
+        log('Page loaded');
         new App();
     })();
     </script>
