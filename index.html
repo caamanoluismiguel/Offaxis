@@ -4,348 +4,249 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>OffAxis 3D</title>
+    <title>OffAxis 3D - Debug v4</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
         body {
-            background: #000;
+            background: #08080c;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: -apple-system, sans-serif;
             touch-action: none;
         }
-        
         #canvas3d {
             width: 100vw;
             height: 100vh;
             display: block;
         }
         
-        /* PIP Camera Preview - Bottom right like in inspo */
+        /* Large PIP for debugging */
         #pip {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 100px;
-            height: 130px;
+            width: 160px;
+            height: 200px;
             border-radius: 12px;
             overflow: hidden;
             z-index: 100;
-            background: #111;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #000;
+            border: 2px solid #ff6600;
         }
-        
         #pip video {
             width: 100%;
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
         }
-        
         #pip canvas {
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
         }
-        
-        /* Tracking indicator */
-        #trackingDot {
+        #trackDot {
             position: absolute;
-            top: 6px;
-            left: 6px;
-            width: 6px;
-            height: 6px;
+            top: 8px; left: 8px;
+            width: 10px; height: 10px;
             border-radius: 50%;
             background: #ff3b30;
         }
+        #trackDot.on { background: #30d158; box-shadow: 0 0 10px #30d158; }
         
-        #trackingDot.active {
-            background: #30d158;
-            box-shadow: 0 0 6px #30d158;
+        /* Debug console - VERY VISIBLE */
+        #debug {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 180px;
+            max-height: 50vh;
+            background: rgba(0,0,0,0.95);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #0f0;
+            overflow-y: auto;
+            z-index: 1000;
         }
+        #debug .e { color: #f55; }
+        #debug .w { color: #fa0; }
+        #debug .s { color: #0f0; }
+        #debug .i { color: #0af; }
         
-        /* Object selector - Left side */
-        #objects {
+        /* Status panel */
+        #status {
+            position: fixed;
+            bottom: 230px;
+            right: 20px;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 11px;
+            color: #fff;
+            z-index: 100;
+            min-width: 160px;
+        }
+        #status div { margin: 4px 0; display: flex; justify-content: space-between; }
+        #status .val { color: #ff6600; font-family: monospace; }
+        
+        /* Object buttons */
+        #objs {
             position: fixed;
             left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
+            bottom: 20px;
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             z-index: 100;
         }
-        
-        .obj-btn {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
+        .obtn {
+            width: 44px; height: 44px;
+            border-radius: 10px;
             border: none;
-            background: rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.1);
             color: #fff;
             font-size: 18px;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        
-        .obj-btn.active {
-            background: rgba(255,102,0,0.2);
-            box-shadow: 0 0 0 1.5px #ff6600;
-        }
-        
-        /* Settings button */
-        #settingsBtn {
-            position: fixed;
-            top: 16px;
-            right: 16px;
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            border: none;
-            background: rgba(255,255,255,0.06);
-            color: #fff;
-            font-size: 16px;
-            cursor: pointer;
-            z-index: 100;
-        }
-        
-        /* Settings panel */
-        #settings {
-            position: fixed;
-            top: 64px;
-            right: 16px;
-            background: rgba(20,20,25,0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 14px;
-            padding: 12px 16px;
-            z-index: 100;
-            display: none;
-            min-width: 160px;
-        }
-        
-        #settings.show { display: block; }
-        
-        .setting {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 0;
-        }
-        
-        .setting label {
-            color: rgba(255,255,255,0.7);
-            font-size: 13px;
-        }
-        
-        .toggle {
-            width: 40px;
-            height: 24px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 12px;
-            position: relative;
-            cursor: pointer;
-        }
-        
-        .toggle.on { background: #30d158; }
-        
-        .toggle::after {
-            content: '';
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 20px;
-            height: 20px;
-            background: #fff;
-            border-radius: 50%;
-            transition: transform 0.2s;
-        }
-        
-        .toggle.on::after { transform: translateX(16px); }
-        
-        /* Loading */
-        #loader {
-            position: fixed;
-            inset: 0;
-            background: #08080c;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            transition: opacity 0.4s;
-        }
-        
-        #loader.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        .spinner {
-            width: 36px;
-            height: 36px;
-            border: 2px solid rgba(255,102,0,0.2);
-            border-top-color: #ff6600;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        #loader p {
-            color: rgba(255,255,255,0.5);
-            font-size: 13px;
-            margin-top: 14px;
-        }
-        
-        /* Intro modal */
-        #intro {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 500;
-            transition: opacity 0.3s;
-        }
-        
-        #intro.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        #introBox {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 20px;
-            padding: 28px 24px;
-            max-width: 280px;
-            text-align: center;
-        }
-        
-        #introBox h2 {
-            color: #fff;
-            font-size: 20px;
-            margin-bottom: 10px;
-        }
-        
-        #introBox p {
-            color: rgba(255,255,255,0.55);
-            font-size: 14px;
-            line-height: 1.45;
-        }
-        
-        #startBtn {
-            margin-top: 20px;
-            padding: 12px 36px;
-            background: linear-gradient(135deg, #ff6600, #ff4400);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-        }
+        .obtn.on { background: rgba(255,102,0,0.3); box-shadow: 0 0 0 2px #ff6600; }
     </style>
 </head>
 <body>
-    <div id="loader">
-        <div class="spinner"></div>
-        <p id="loadTxt">Loading...</p>
-    </div>
-    
-    <div id="intro" class="hidden">
-        <div id="introBox">
-            <h2>📱 Move Your Head</h2>
-            <p>Look at your screen and move your head around. The 3D object shifts like looking through a window.</p>
-            <button id="startBtn">Start</button>
-        </div>
-    </div>
-    
     <canvas id="canvas3d"></canvas>
     
     <div id="pip">
-        <video id="video" playsinline autoplay muted></video>
-        <canvas id="overlay"></canvas>
-        <div id="trackingDot"></div>
+        <video id="vid" playsinline autoplay muted></video>
+        <canvas id="ovr"></canvas>
+        <div id="trackDot"></div>
     </div>
     
-    <div id="objects">
-        <button class="obj-btn active" data-obj="sneaker">👟</button>
-        <button class="obj-btn" data-obj="cube">🎲</button>
-        <button class="obj-btn" data-obj="tower">🏛️</button>
-        <button class="obj-btn" data-obj="gem">💎</button>
+    <div id="debug"></div>
+    
+    <div id="status">
+        <div>Camera <span class="val" id="sCam">--</span></div>
+        <div>Video Size <span class="val" id="sVid">--</span></div>
+        <div>TF Backend <span class="val" id="sTF">--</span></div>
+        <div>Model <span class="val" id="sMod">--</span></div>
+        <div>Detecting <span class="val" id="sDet">--</span></div>
+        <div>Faces <span class="val" id="sFace">--</span></div>
+        <div>X <span class="val" id="sX">0</span></div>
+        <div>Y <span class="val" id="sY">0</span></div>
+        <div>Z <span class="val" id="sZ">0</span></div>
     </div>
     
-    <button id="settingsBtn">⚙️</button>
-    <div id="settings">
-        <div class="setting">
-            <label>Grid</label>
-            <div class="toggle on" data-s="grid"></div>
-        </div>
-        <div class="setting">
-            <label>Auto Rotate</label>
-            <div class="toggle" data-s="rotate"></div>
-        </div>
+    <div id="objs">
+        <button class="obtn on" data-o="shoe">👟</button>
+        <button class="obtn" data-o="cube">🎲</button>
+        <button class="obtn" data-o="gem">💎</button>
     </div>
 
+    <!-- THREE.JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.5/dist/face-landmarks-detection.min.js"></script>
+    
+    <!-- TensorFlow - TRY OLDER MORE STABLE VERSION -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    
+    <!-- BlazeFace - SIMPLER AND MORE RELIABLE -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.1.0/dist/blazeface.min.js"></script>
     
     <script>
     (function() {
-        const $ = id => document.getElementById(id);
+        'use strict';
         
+        // ===================
+        // DEBUG SYSTEM
+        // ===================
+        const debugEl = document.getElementById('debug');
+        let logCount = 0;
+        
+        function log(msg, type = 'i') {
+            const ts = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${++logCount}] ${ts} | ${msg}`;
+            debugEl.appendChild(div);
+            debugEl.scrollTop = debugEl.scrollHeight;
+            console.log(`[${type}] ${msg}`);
+        }
+        
+        function stat(id, val, color) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = val;
+                if (color) el.style.color = color;
+            }
+        }
+        
+        // ===================
+        // MAIN APP
+        // ===================
         class App {
             constructor() {
-                this.video = $('video');
-                this.overlay = $('overlay');
+                log('App constructor starting...', 's');
+                
+                this.vid = document.getElementById('vid');
+                this.ovr = document.getElementById('ovr');
                 this.ctx = null;
-                this.detector = null;
+                this.model = null;
+                
                 this.scene = null;
                 this.camera = null;
                 this.renderer = null;
                 this.obj = null;
                 this.grid = null;
-                this.objType = 'sneaker';
-                this.showGrid = true;
-                this.autoRotate = false;
+                
                 this.face = { x: 0, y: 0, z: 500 };
                 this.smooth = { x: 0, y: 0, z: 500 };
                 this.tracking = false;
+                this.detectCount = 0;
+                this.faceCount = 0;
+                
                 this.init();
             }
             
-            load(t) { $('loadTxt').textContent = t; }
-            
             async init() {
-                this.load('Setting up 3D...');
-                this.setup3D();
-                this.load('Accessing camera...');
-                await this.setupCam();
-                this.load('Loading face AI...');
-                await this.setupAI();
-                this.setupUI();
-                this.animate();
-                $('loader').classList.add('hidden');
-                $('intro').classList.remove('hidden');
+                try {
+                    log('=== INIT START ===', 's');
+                    
+                    // Step 1: 3D
+                    log('Step 1: Setting up Three.js...', 'i');
+                    this.setup3D();
+                    log('Three.js ready ✓', 's');
+                    
+                    // Step 2: Camera
+                    log('Step 2: Setting up camera...', 'i');
+                    await this.setupCamera();
+                    
+                    // Step 3: Face detection
+                    log('Step 3: Setting up face detection...', 'i');
+                    await this.setupFaceDetection();
+                    
+                    // Step 4: UI
+                    log('Step 4: Setting up UI...', 'i');
+                    this.setupUI();
+                    
+                    // Step 5: Start animation
+                    log('Step 5: Starting render loop...', 'i');
+                    this.animate();
+                    
+                    log('=== INIT COMPLETE ===', 's');
+                    
+                } catch (err) {
+                    log(`FATAL ERROR: ${err.message}`, 'e');
+                    log(`Stack: ${err.stack}`, 'e');
+                }
             }
             
             setup3D() {
-                const canvas = $('canvas3d');
+                const canvas = document.getElementById('canvas3d');
+                
                 this.scene = new THREE.Scene();
                 this.camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 1, 5000);
                 this.camera.position.z = 500;
+                
                 this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
                 this.renderer.setSize(innerWidth, innerHeight);
                 this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -353,391 +254,464 @@
                 
                 // Lights
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-                const main = new THREE.DirectionalLight(0xffffff, 1);
-                main.position.set(100, 150, 100);
-                this.scene.add(main);
-                const fill = new THREE.DirectionalLight(0xff6600, 0.25);
-                fill.position.set(-100, 50, -50);
-                this.scene.add(fill);
-                const rim = new THREE.DirectionalLight(0x0088ff, 0.25);
-                rim.position.set(0, -100, -100);
-                this.scene.add(rim);
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(100, 150, 100);
+                this.scene.add(light);
                 
-                this.makeGrid();
-                this.makeObj('sneaker');
-            }
-            
-            makeGrid() {
-                this.grid = new THREE.Group();
-                
-                // Floor - orange synthwave grid
-                const floor = new THREE.GridHelper(600, 30, 0xff6600, 0x1a0a00);
-                floor.position.y = -80;
-                floor.material.transparent = true;
-                floor.material.opacity = 0.5;
-                this.grid.add(floor);
-                
-                // Back wall grid
-                const back = new THREE.GridHelper(400, 20, 0xff6600, 0x1a0a00);
-                back.rotation.x = Math.PI/2;
-                back.position.set(0, 50, -200);
-                back.material.transparent = true;
-                back.material.opacity = 0.25;
-                this.grid.add(back);
-                
-                // Horizon glow line
-                const hGeo = new THREE.PlaneGeometry(700, 1.5);
-                const hMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.7 });
-                const horizon = new THREE.Mesh(hGeo, hMat);
-                horizon.position.set(0, -79.5, -300);
-                horizon.rotation.x = -Math.PI/2;
-                this.grid.add(horizon);
-                
+                // Grid
+                this.grid = new THREE.GridHelper(400, 20, 0xff6600, 0x1a0800);
+                this.grid.position.y = -80;
                 this.scene.add(this.grid);
+                
+                // Initial object
+                this.makeObj('shoe');
             }
             
             makeObj(type) {
                 if (this.obj) this.scene.remove(this.obj);
-                this.objType = type;
                 
-                switch(type) {
-                    case 'sneaker': this.obj = this.mkSneaker(); break;
-                    case 'cube': this.obj = this.mkCube(); break;
-                    case 'tower': this.obj = this.mkTower(); break;
-                    case 'gem': this.obj = this.mkGem(); break;
+                const g = new THREE.Group();
+                
+                if (type === 'shoe') {
+                    // Simplified sneaker
+                    const sole = new THREE.Mesh(
+                        new THREE.BoxGeometry(100, 14, 40),
+                        new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a })
+                    );
+                    sole.position.y = -30;
+                    g.add(sole);
+                    
+                    const mid = new THREE.Mesh(
+                        new THREE.BoxGeometry(95, 18, 38),
+                        new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+                    );
+                    mid.position.y = -16;
+                    g.add(mid);
+                    
+                    const upper = new THREE.Mesh(
+                        new THREE.BoxGeometry(85, 35, 34),
+                        new THREE.MeshPhysicalMaterial({ color: 0x2d2d2d })
+                    );
+                    upper.position.y = 8;
+                    g.add(upper);
+                    
+                    // Orange stripes
+                    for (let i = 0; i < 3; i++) {
+                        const stripe = new THREE.Mesh(
+                            new THREE.BoxGeometry(4, 26, 36),
+                            new THREE.MeshBasicMaterial({ color: 0xff6600 })
+                        );
+                        stripe.position.set(-10 + i*18, 8, 0);
+                        stripe.rotation.z = 0.25;
+                        g.add(stripe);
+                    }
+                    
+                    g.rotation.y = -0.4;
+                    g.position.y = 10;
+                    
+                } else if (type === 'cube') {
+                    const cube = new THREE.Mesh(
+                        new THREE.BoxGeometry(80, 80, 80),
+                        new THREE.MeshPhysicalMaterial({ color: 0xff6600, metalness: 0.3 })
+                    );
+                    g.add(cube);
+                    
+                } else if (type === 'gem') {
+                    const gem = new THREE.Mesh(
+                        new THREE.OctahedronGeometry(50, 0),
+                        new THREE.MeshPhysicalMaterial({ color: 0xff00ff, clearcoat: 1 })
+                    );
+                    g.add(gem);
                 }
+                
+                this.obj = g;
                 this.scene.add(this.obj);
             }
             
-            mkSneaker() {
-                const g = new THREE.Group();
+            async setupCamera() {
+                stat('sCam', 'Starting...', '#fa0');
                 
-                // Sole
-                const sole = new THREE.Mesh(
-                    new THREE.BoxGeometry(100, 14, 40),
-                    new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a, roughness: 0.9 })
-                );
-                sole.position.y = -32;
-                g.add(sole);
-                
-                // Midsole
-                const mid = new THREE.Mesh(
-                    new THREE.BoxGeometry(95, 18, 38),
-                    new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3 })
-                );
-                mid.position.y = -18;
-                g.add(mid);
-                
-                // Upper
-                const upper = new THREE.Mesh(
-                    new THREE.BoxGeometry(88, 35, 34),
-                    new THREE.MeshPhysicalMaterial({ color: 0x2d2d2d, roughness: 0.7 })
-                );
-                upper.position.y = 8;
-                g.add(upper);
-                
-                // Toe
-                const toe = new THREE.Mesh(
-                    new THREE.SphereGeometry(20, 16, 16),
-                    new THREE.MeshPhysicalMaterial({ color: 0x3a3a3a, roughness: 0.5 })
-                );
-                toe.position.set(40, 5, 0);
-                toe.scale.set(1.2, 0.7, 1);
-                g.add(toe);
-                
-                // Orange stripes
-                for (let i = 0; i < 3; i++) {
-                    const stripe = new THREE.Mesh(
-                        new THREE.BoxGeometry(4, 26, 36),
-                        new THREE.MeshBasicMaterial({ color: 0xff6600 })
-                    );
-                    stripe.position.set(-12 + i*20, 8, 0);
-                    stripe.rotation.z = 0.25;
-                    g.add(stripe);
+                // Check API availability
+                if (!navigator.mediaDevices) {
+                    log('navigator.mediaDevices is UNDEFINED', 'e');
+                    stat('sCam', 'No API', '#f55');
+                    this.setupTouch();
+                    return;
                 }
                 
-                // Yellow heel tab
-                const heel = new THREE.Mesh(
-                    new THREE.BoxGeometry(14, 28, 18),
-                    new THREE.MeshPhysicalMaterial({ color: 0xffcc00, emissive: 0x332800, emissiveIntensity: 0.3 })
-                );
-                heel.position.set(-44, 20, 0);
-                g.add(heel);
-                
-                g.rotation.y = -0.4;
-                g.position.y = 10;
-                return g;
-            }
-            
-            mkCube() {
-                const g = new THREE.Group();
-                const cube = new THREE.Mesh(
-                    new THREE.BoxGeometry(80, 80, 80),
-                    new THREE.MeshPhysicalMaterial({ color: 0xff6600, metalness: 0.3, roughness: 0.15, clearcoat: 0.8 })
-                );
-                g.add(cube);
-                const wire = new THREE.Mesh(
-                    new THREE.BoxGeometry(82, 82, 82),
-                    new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2 })
-                );
-                g.add(wire);
-                return g;
-            }
-            
-            mkTower() {
-                const g = new THREE.Group();
-                const tower = new THREE.Mesh(
-                    new THREE.BoxGeometry(55, 140, 55),
-                    new THREE.MeshPhysicalMaterial({ color: 0x6699cc, metalness: 0.8, roughness: 0.2, transparent: true, opacity: 0.9 })
-                );
-                g.add(tower);
-                
-                for (let y = -55; y < 65; y += 15) {
-                    for (let x = -18; x <= 18; x += 18) {
-                        const win = new THREE.Mesh(
-                            new THREE.BoxGeometry(12, 10, 2),
-                            new THREE.MeshBasicMaterial({ color: Math.random() > 0.3 ? 0xffffaa : 0x334455 })
-                        );
-                        win.position.set(x, y, 28);
-                        g.add(win);
-                    }
+                if (!navigator.mediaDevices.getUserMedia) {
+                    log('getUserMedia is UNDEFINED', 'e');
+                    stat('sCam', 'No gUM', '#f55');
+                    this.setupTouch();
+                    return;
                 }
                 
-                const roof = new THREE.Mesh(
-                    new THREE.CylinderGeometry(10, 32, 28, 4),
-                    new THREE.MeshPhysicalMaterial({ color: 0x445566, metalness: 0.9, roughness: 0.1 })
-                );
-                roof.position.y = 84;
-                roof.rotation.y = Math.PI/4;
-                g.add(roof);
+                log('Camera API available ✓', 's');
                 
-                const ant = new THREE.Mesh(
-                    new THREE.CylinderGeometry(2, 2, 40, 8),
-                    new THREE.MeshBasicMaterial({ color: 0xff6600 })
-                );
-                ant.position.y = 118;
-                g.add(ant);
-                
-                g.position.y = -10;
-                return g;
-            }
-            
-            mkGem() {
-                const g = new THREE.Group();
-                const gem = new THREE.Mesh(
-                    new THREE.OctahedronGeometry(50, 0),
-                    new THREE.MeshPhysicalMaterial({ color: 0xff00ff, metalness: 0.2, roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.9 })
-                );
-                g.add(gem);
-                
-                [0x00ffff, 0xff00ff, 0xffff00].forEach((col, i) => {
-                    const ring = new THREE.Mesh(
-                        new THREE.TorusGeometry(70 + i*20, 2, 8, 64),
-                        new THREE.MeshBasicMaterial({ color: col })
-                    );
-                    ring.rotation.x = Math.PI/2 + i*0.4;
-                    ring.rotation.y = i*0.6;
-                    ring.userData.spd = 0.008 + i*0.004;
-                    g.add(ring);
-                });
-                
-                return g;
-            }
-            
-            async setupCam() {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
+                    log('Requesting camera permission...', 'i');
+                    
+                    const constraints = {
+                        video: {
+                            facingMode: 'user',
+                            width: { ideal: 320, max: 640 },
+                            height: { ideal: 240, max: 480 }
+                        },
                         audio: false
-                    });
-                    this.video.srcObject = stream;
-                    await new Promise(r => {
-                        this.video.onloadedmetadata = () => {
-                            this.overlay.width = this.video.videoWidth;
-                            this.overlay.height = this.video.videoHeight;
-                            this.ctx = this.overlay.getContext('2d');
-                            this.video.play().then(r);
+                    };
+                    
+                    log(`Constraints: ${JSON.stringify(constraints)}`, 'i');
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    log('Got media stream ✓', 's');
+                    
+                    const tracks = stream.getVideoTracks();
+                    log(`Video tracks: ${tracks.length}`, 'i');
+                    
+                    if (tracks.length > 0) {
+                        const settings = tracks[0].getSettings();
+                        log(`Track settings: ${JSON.stringify(settings)}`, 'i');
+                    }
+                    
+                    this.vid.srcObject = stream;
+                    log('Set video srcObject ✓', 's');
+                    
+                    // Wait for video metadata
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error('Video metadata timeout (10s)'));
+                        }, 10000);
+                        
+                        this.vid.onloadedmetadata = () => {
+                            clearTimeout(timeout);
+                            log(`Video metadata loaded: ${this.vid.videoWidth}x${this.vid.videoHeight}`, 's');
+                            stat('sVid', `${this.vid.videoWidth}x${this.vid.videoHeight}`, '#0f0');
+                            resolve();
+                        };
+                        
+                        this.vid.onerror = (e) => {
+                            clearTimeout(timeout);
+                            log(`Video element error: ${e}`, 'e');
+                            reject(new Error('Video element error'));
                         };
                     });
-                } catch(e) {
-                    console.warn('Cam err:', e);
-                    this.touchFallback();
+                    
+                    // Setup overlay canvas
+                    this.ovr.width = this.vid.videoWidth;
+                    this.ovr.height = this.vid.videoHeight;
+                    this.ctx = this.ovr.getContext('2d');
+                    log(`Overlay canvas: ${this.ovr.width}x${this.ovr.height}`, 'i');
+                    
+                    // Play video
+                    log('Attempting to play video...', 'i');
+                    await this.vid.play();
+                    log('Video playing ✓', 's');
+                    
+                    stat('sCam', 'OK', '#0f0');
+                    
+                } catch (err) {
+                    log(`Camera error: ${err.name}: ${err.message}`, 'e');
+                    stat('sCam', 'FAIL', '#f55');
+                    this.setupTouch();
                 }
             }
             
-            touchFallback() {
-                const upd = (x, y) => {
-                    this.face.x = -((x/innerWidth) - 0.5) * 300;
-                    this.face.y = -((y/innerHeight) - 0.5) * 200;
+            setupTouch() {
+                log('Setting up touch/mouse fallback...', 'w');
+                
+                const update = (x, y) => {
+                    this.face.x = -((x / innerWidth) - 0.5) * 300;
+                    this.face.y = -((y / innerHeight) - 0.5) * 200;
                     this.tracking = true;
-                    $('trackingDot').classList.add('active');
+                    document.getElementById('trackDot').classList.add('on');
+                    stat('sFace', 'Touch', '#0af');
                 };
-                document.addEventListener('mousemove', e => upd(e.clientX, e.clientY));
-                document.addEventListener('touchmove', e => { e.preventDefault(); upd(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+                
+                document.addEventListener('mousemove', e => update(e.clientX, e.clientY));
+                document.addEventListener('touchmove', e => {
+                    e.preventDefault();
+                    update(e.touches[0].clientX, e.touches[0].clientY);
+                }, { passive: false });
+                
+                log('Touch fallback ready ✓', 's');
             }
             
-            async setupAI() {
-                if (!this.video.srcObject) return;
+            async setupFaceDetection() {
+                // Check if camera is working
+                if (!this.vid.srcObject) {
+                    log('No video stream - skipping face detection', 'w');
+                    stat('sMod', 'Skipped', '#fa0');
+                    return;
+                }
+                
+                stat('sTF', 'Loading...', '#fa0');
+                stat('sMod', 'Loading...', '#fa0');
+                
                 try {
-                    await tf.setBackend('webgl');
-                    await tf.ready();
-                    this.detector = await faceLandmarksDetection.createDetector(
-                        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-                        { runtime: 'tfjs', refineLandmarks: false, maxFaces: 1 }
-                    );
+                    // Check if TF is loaded
+                    if (typeof tf === 'undefined') {
+                        throw new Error('TensorFlow.js not loaded!');
+                    }
+                    log('TensorFlow.js is loaded ✓', 's');
+                    
+                    // Setup backend
+                    log('Setting up TF backend...', 'i');
+                    log(`Available backends: ${Object.keys(tf.engine().registryFactory).join(', ')}`, 'i');
+                    
+                    // Try WebGL first, then WASM, then CPU
+                    let backend = null;
+                    for (const be of ['webgl', 'wasm', 'cpu']) {
+                        try {
+                            await tf.setBackend(be);
+                            await tf.ready();
+                            backend = tf.getBackend();
+                            log(`Using backend: ${backend} ✓`, 's');
+                            break;
+                        } catch (e) {
+                            log(`Backend ${be} failed: ${e.message}`, 'w');
+                        }
+                    }
+                    
+                    if (!backend) {
+                        throw new Error('No TF backend available!');
+                    }
+                    
+                    stat('sTF', backend, '#0f0');
+                    
+                    // Check if BlazeFace is loaded
+                    if (typeof blazeface === 'undefined') {
+                        throw new Error('BlazeFace not loaded!');
+                    }
+                    log('BlazeFace library loaded ✓', 's');
+                    
+                    // Load BlazeFace model
+                    log('Loading BlazeFace model (this may take a moment)...', 'i');
+                    
+                    this.model = await blazeface.load();
+                    
+                    log('BlazeFace model loaded ✓', 's');
+                    stat('sMod', 'Ready', '#0f0');
+                    
+                    // Start detection loop
+                    log('Starting detection loop...', 'i');
                     this.detectLoop();
-                } catch(e) {
-                    console.warn('AI err:', e);
-                    this.touchFallback();
+                    
+                } catch (err) {
+                    log(`Face detection setup error: ${err.message}`, 'e');
+                    log(`Error stack: ${err.stack}`, 'e');
+                    stat('sMod', 'FAIL', '#f55');
+                    this.setupTouch();
                 }
             }
             
             async detectLoop() {
-                if (!this.detector || this.video.readyState < 2) {
-                    requestAnimationFrame(() => this.detectLoop());
-                    return;
-                }
+                stat('sDet', 'Running', '#0f0');
                 
-                try {
-                    const faces = await this.detector.estimateFaces(this.video, { flipHorizontal: false });
-                    if (this.ctx) this.ctx.clearRect(0, 0, this.overlay.width, this.overlay.height);
-                    
-                    if (faces.length) {
-                        const kp = faces[0].keypoints;
-                        this.drawFace(kp);
-                        
-                        const nose = kp[1], le = kp[33], re = kp[263];
-                        const eyeD = Math.hypot(re.x - le.x, re.y - le.y);
-                        
-                        const nx = -((nose.x / this.video.videoWidth) - 0.5) * 2;
-                        const ny = ((nose.y / this.video.videoHeight) - 0.5) * 2;
-                        
-                        this.face.x = nx * 180;
-                        this.face.y = -ny * 140;
-                        this.face.z = Math.max(250, Math.min(800, 500 / (eyeD / (this.video.videoWidth * 0.12))));
-                        
-                        this.tracking = true;
-                        $('trackingDot').classList.add('active');
-                    } else {
-                        this.tracking = false;
-                        $('trackingDot').classList.remove('active');
+                const detect = async () => {
+                    // Check prerequisites
+                    if (!this.model) {
+                        log('Model is null in detect loop!', 'e');
+                        return;
                     }
-                } catch(e) {}
+                    
+                    if (!this.vid || this.vid.readyState < 2) {
+                        // Video not ready yet, wait
+                        requestAnimationFrame(detect);
+                        return;
+                    }
+                    
+                    this.detectCount++;
+                    
+                    try {
+                        // BlazeFace detection
+                        const predictions = await this.model.estimateFaces(this.vid, false);
+                        
+                        // Clear overlay
+                        if (this.ctx) {
+                            this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
+                        }
+                        
+                        // Update stats every 30 frames
+                        if (this.detectCount % 30 === 0) {
+                            stat('sDet', `#${this.detectCount}`, '#0f0');
+                        }
+                        
+                        if (predictions.length > 0) {
+                            this.faceCount++;
+                            const face = predictions[0];
+                            
+                            // BlazeFace returns: topLeft, bottomRight, landmarks, probability
+                            const topLeft = face.topLeft;
+                            const bottomRight = face.bottomRight;
+                            const landmarks = face.landmarks;
+                            
+                            // Draw face box and landmarks
+                            this.drawFace(topLeft, bottomRight, landmarks);
+                            
+                            // Calculate center of face
+                            const centerX = (topLeft[0] + bottomRight[0]) / 2;
+                            const centerY = (topLeft[1] + bottomRight[1]) / 2;
+                            
+                            // Face box size for depth estimation
+                            const faceWidth = bottomRight[0] - topLeft[0];
+                            const faceHeight = bottomRight[1] - topLeft[1];
+                            
+                            // Normalize to -1 to 1 (flip X because video is mirrored in CSS)
+                            const nx = -((centerX / this.vid.videoWidth) - 0.5) * 2;
+                            const ny = ((centerY / this.vid.videoHeight) - 0.5) * 2;
+                            
+                            // Map to 3D space
+                            this.face.x = nx * 180;
+                            this.face.y = -ny * 140;
+                            
+                            // Depth from face size
+                            const baseFaceWidth = this.vid.videoWidth * 0.3;
+                            const depthRatio = faceWidth / baseFaceWidth;
+                            this.face.z = Math.max(250, Math.min(800, 500 / Math.max(0.3, depthRatio)));
+                            
+                            this.tracking = true;
+                            document.getElementById('trackDot').classList.add('on');
+                            stat('sFace', `YES (${this.faceCount})`, '#0f0');
+                            
+                        } else {
+                            this.tracking = false;
+                            document.getElementById('trackDot').classList.remove('on');
+                            stat('sFace', 'NO', '#f55');
+                        }
+                        
+                        // Update position stats
+                        stat('sX', this.face.x.toFixed(0));
+                        stat('sY', this.face.y.toFixed(0));
+                        stat('sZ', this.face.z.toFixed(0));
+                        
+                    } catch (err) {
+                        log(`Detection error: ${err.message}`, 'e');
+                        stat('sDet', 'ERROR', '#f55');
+                    }
+                    
+                    requestAnimationFrame(detect);
+                };
                 
-                requestAnimationFrame(() => this.detectLoop());
+                detect();
             }
             
-            drawFace(kp) {
-                const c = this.ctx, w = this.overlay.width;
+            drawFace(topLeft, bottomRight, landmarks) {
+                const c = this.ctx;
+                const w = this.ovr.width;
+                
+                // Mirror transform to match CSS scaleX(-1)
                 c.save();
                 c.translate(w, 0);
                 c.scale(-1, 1);
                 
-                // Nose
-                const n = kp[1];
-                c.beginPath();
-                c.arc(n.x, n.y, 6, 0, Math.PI*2);
-                c.fillStyle = 'rgba(255,102,0,0.5)';
-                c.fill();
+                // Draw face bounding box
                 c.strokeStyle = '#ff6600';
                 c.lineWidth = 2;
-                c.stroke();
+                c.strokeRect(
+                    topLeft[0], 
+                    topLeft[1], 
+                    bottomRight[0] - topLeft[0], 
+                    bottomRight[1] - topLeft[1]
+                );
                 
-                // Eyes
-                c.fillStyle = '#00ffff';
-                [kp[33], kp[263]].forEach(e => {
-                    c.beginPath();
-                    c.arc(e.x, e.y, 3, 0, Math.PI*2);
-                    c.fill();
-                });
-                
-                // Outline
-                c.strokeStyle = 'rgba(255,102,0,0.3)';
-                c.lineWidth = 1;
-                c.beginPath();
-                [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10].forEach((i, j) => {
-                    const p = kp[i];
-                    j === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y);
-                });
-                c.closePath();
-                c.stroke();
+                // Draw landmarks (BlazeFace has 6: right eye, left eye, nose, mouth, right ear, left ear)
+                if (landmarks && landmarks.length > 0) {
+                    // Nose (index 2) - main tracking point
+                    if (landmarks[2]) {
+                        c.beginPath();
+                        c.arc(landmarks[2][0], landmarks[2][1], 8, 0, Math.PI * 2);
+                        c.fillStyle = 'rgba(255, 102, 0, 0.6)';
+                        c.fill();
+                        c.strokeStyle = '#ff6600';
+                        c.lineWidth = 2;
+                        c.stroke();
+                    }
+                    
+                    // Eyes (indices 0, 1)
+                    c.fillStyle = '#00ffff';
+                    for (let i = 0; i < 2; i++) {
+                        if (landmarks[i]) {
+                            c.beginPath();
+                            c.arc(landmarks[i][0], landmarks[i][1], 4, 0, Math.PI * 2);
+                            c.fill();
+                        }
+                    }
+                    
+                    // Mouth (index 3)
+                    if (landmarks[3]) {
+                        c.fillStyle = '#ff00ff';
+                        c.beginPath();
+                        c.arc(landmarks[3][0], landmarks[3][1], 4, 0, Math.PI * 2);
+                        c.fill();
+                    }
+                }
                 
                 c.restore();
             }
             
             setupUI() {
-                $('startBtn').onclick = () => $('intro').classList.add('hidden');
-                
-                document.querySelectorAll('.obj-btn').forEach(b => {
-                    b.onclick = () => {
-                        document.querySelectorAll('.obj-btn').forEach(x => x.classList.remove('active'));
-                        b.classList.add('active');
-                        this.makeObj(b.dataset.obj);
+                // Object buttons
+                document.querySelectorAll('.obtn').forEach(btn => {
+                    btn.onclick = () => {
+                        document.querySelectorAll('.obtn').forEach(b => b.classList.remove('on'));
+                        btn.classList.add('on');
+                        this.makeObj(btn.dataset.o);
+                        log(`Changed object to: ${btn.dataset.o}`, 'i');
                     };
                 });
                 
-                $('settingsBtn').onclick = () => $('settings').classList.toggle('show');
-                
-                document.querySelectorAll('.toggle').forEach(t => {
-                    t.onclick = () => {
-                        t.classList.toggle('on');
-                        if (t.dataset.s === 'grid') {
-                            this.showGrid = t.classList.contains('on');
-                            this.grid.visible = this.showGrid;
-                        } else if (t.dataset.s === 'rotate') {
-                            this.autoRotate = t.classList.contains('on');
-                        }
-                    };
-                });
-                
+                // Resize
                 window.addEventListener('resize', () => {
                     this.camera.aspect = innerWidth / innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(innerWidth, innerHeight);
                 });
+                
+                log('UI setup complete ✓', 's');
             }
             
-            updateProj() {
+            updateProjection() {
+                // Smooth the position
                 this.smooth.x += (this.face.x - this.smooth.x) * 0.12;
                 this.smooth.y += (this.face.y - this.smooth.y) * 0.12;
                 this.smooth.z += (this.face.z - this.smooth.z) * 0.12;
                 
                 const { x, y, z } = this.smooth;
-                const asp = innerWidth / innerHeight;
-                const hw = 150, hh = hw / asp;
-                const n = 10, f = 2500, r = n / z;
+                
+                // Off-axis projection
+                const aspect = innerWidth / innerHeight;
+                const halfW = 150;
+                const halfH = halfW / aspect;
+                const near = 10;
+                const far = 2500;
+                const r = near / z;
                 
                 this.camera.projectionMatrix.makePerspective(
-                    (-hw - x) * r, (hw - x) * r,
-                    (hh - y) * r, (-hh - y) * r,
-                    n, f
+                    (-halfW - x) * r,
+                    (halfW - x) * r,
+                    (halfH - y) * r,
+                    (-halfH - y) * r,
+                    near, far
                 );
                 this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+                
                 this.camera.position.set(x, y, z);
                 this.camera.lookAt(x, y, 0);
             }
             
             animate() {
                 requestAnimationFrame(() => this.animate());
-                
-                this.updateProj();
-                
-                if (this.obj) {
-                    if (this.autoRotate) this.obj.rotation.y += 0.005;
-                    
-                    if (this.objType === 'gem') {
-                        const t = performance.now() * 0.001;
-                        this.obj.children.forEach(c => {
-                            if (c.userData.spd) c.rotation.z += c.userData.spd;
-                        });
-                        this.obj.children[0].rotation.x = t * 0.3;
-                        this.obj.children[0].rotation.y = t * 0.2;
-                    }
-                }
-                
+                this.updateProjection();
                 this.renderer.render(this.scene, this.camera);
             }
         }
+        
+        // START
+        log('=== PAGE LOADED ===', 's');
+        log(`User Agent: ${navigator.userAgent}`, 'i');
+        log(`Protocol: ${location.protocol}`, 'i');
+        log(`Host: ${location.host}`, 'i');
         
         new App();
     })();
