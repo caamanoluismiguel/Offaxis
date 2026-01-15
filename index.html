@@ -31,6 +31,11 @@
             z-index: 100;
             background: #000;
             border: 2px solid rgba(255,102,0,0.5);
+            transition: opacity 0.3s, border-color 0.3s;
+        }
+        #pip.paused {
+            opacity: 0.4;
+            border-color: rgba(255,255,255,0.3);
         }
         #pip video {
             width: 100%;
@@ -113,6 +118,126 @@
             background: rgba(255,102,0,0.3);
         }
         
+        /* Mode Toggle Button */
+        #modeToggle {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,102,0,0.9);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 24px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 20px rgba(255,102,0,0.4);
+            transition: all 0.3s;
+        }
+        #modeToggle:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+        #modeToggle.edit {
+            background: rgba(0,200,100,0.9);
+            box-shadow: 0 4px 20px rgba(0,200,100,0.4);
+        }
+        #modeToggle .icon {
+            font-size: 18px;
+        }
+        
+        /* Rotation Controls Panel */
+        #rotControls {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0,0,0,0.9);
+            border: 1px solid rgba(0,200,100,0.5);
+            border-radius: 16px;
+            padding: 12px 16px;
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+        #rotControls.show {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+        #rotControls .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+        }
+        #rotControls .axis-label {
+            color: #888;
+            font-size: 11px;
+            width: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        #rotControls button {
+            width: 44px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        #rotControls button:active {
+            transform: scale(0.92);
+            background: rgba(255,255,255,0.2);
+        }
+        #rotControls button.rot-x { border-bottom: 2px solid #ff4444; }
+        #rotControls button.rot-y { border-bottom: 2px solid #44ff44; }
+        #rotControls button.rot-z { border-bottom: 2px solid #4488ff; }
+        #rotControls button.reset {
+            background: rgba(255,102,0,0.3);
+            border-bottom: 2px solid #ff6600;
+            width: auto;
+            padding: 0 16px;
+        }
+        
+        /* Edit mode hint */
+        #editHint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            border: 1px solid rgba(0,200,100,0.5);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #fff;
+            font-size: 13px;
+            text-align: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        #editHint.show {
+            opacity: 1;
+        }
+        #editHint .gesture {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
         /* Model info */
         #modelInfo {
             position: fixed;
@@ -186,6 +311,7 @@
     </div>
     
     <div id="status">
+        <div>Mode <span class="v" id="sMode">VIEW</span></div>
         <div>Cam <span class="v" id="sCam">--</span></div>
         <div>Track <span class="v" id="sTrack">--</span></div>
         <div>Face <span class="v" id="sFace">--</span></div>
@@ -208,6 +334,40 @@
         <span>📦</span>
         <span class="name" id="modelName"></span>
         <button class="close" id="clearModel">✕</button>
+    </div>
+    
+    <!-- Mode Toggle Button -->
+    <button id="modeToggle">
+        <span class="icon">👁️</span>
+        <span class="label">VIEW MODE</span>
+    </button>
+    
+    <!-- Rotation Controls (shown in Edit mode) -->
+    <div id="rotControls">
+        <div class="row">
+            <span class="axis-label">X</span>
+            <button class="rot-x" data-axis="x" data-dir="-1">-90°</button>
+            <button class="rot-x" data-axis="x" data-dir="1">+90°</button>
+        </div>
+        <div class="row">
+            <span class="axis-label">Y</span>
+            <button class="rot-y" data-axis="y" data-dir="-1">-90°</button>
+            <button class="rot-y" data-axis="y" data-dir="1">+90°</button>
+        </div>
+        <div class="row">
+            <span class="axis-label">Z</span>
+            <button class="rot-z" data-axis="z" data-dir="-1">-90°</button>
+            <button class="rot-z" data-axis="z" data-dir="1">+90°</button>
+        </div>
+        <div class="row">
+            <button class="reset" id="resetRot">↺ Reset</button>
+        </div>
+    </div>
+    
+    <!-- Edit mode hint -->
+    <div id="editHint">
+        <div class="gesture">👆👆</div>
+        <div>Two-finger drag to rotate</div>
     </div>
     
     <div id="loading">
@@ -253,7 +413,6 @@
                 const nFaces = reader.getUint32(80, true);
                 const expect = 80 + (32/8) + (nFaces * faceSize);
                 if (expect === reader.byteLength) return true;
-                // Check for "solid" text
                 const solid = [115, 111, 108, 105, 100];
                 for (let i = 0; i < 5; i++) {
                     if (solid[i] !== reader.getUint8(i)) return true;
@@ -331,6 +490,71 @@
             }
         }
         
+        // ============ AUTO-ORIENTATION ============
+        function autoOrientGeometry(geo) {
+            geo.computeBoundingBox();
+            const box = geo.boundingBox;
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            
+            log(`Original dims: X=${size.x.toFixed(1)}, Y=${size.y.toFixed(1)}, Z=${size.z.toFixed(1)}`);
+            
+            // Analyze principal axes using vertex positions
+            const pos = geo.attributes.position.array;
+            let varX = 0, varY = 0, varZ = 0;
+            const n = pos.length / 3;
+            
+            // Calculate variance in each axis
+            let sumX = 0, sumY = 0, sumZ = 0;
+            for (let i = 0; i < pos.length; i += 3) {
+                sumX += pos[i];
+                sumY += pos[i + 1];
+                sumZ += pos[i + 2];
+            }
+            const meanX = sumX / n, meanY = sumY / n, meanZ = sumZ / n;
+            
+            for (let i = 0; i < pos.length; i += 3) {
+                varX += (pos[i] - meanX) ** 2;
+                varY += (pos[i + 1] - meanY) ** 2;
+                varZ += (pos[i + 2] - meanZ) ** 2;
+            }
+            
+            // Find which axis has lowest variance (likely the "flat" direction)
+            const vars = [
+                { axis: 'x', val: varX, size: size.x },
+                { axis: 'y', val: varY, size: size.y },
+                { axis: 'z', val: varZ, size: size.z }
+            ];
+            vars.sort((a, b) => a.size - b.size);
+            
+            const thinnest = vars[0].axis;
+            const tallest = vars[2].axis;
+            
+            log(`Thinnest axis: ${thinnest}, Tallest axis: ${tallest}`);
+            
+            // Apply rotation to make model upright
+            // We want the tallest dimension to be Y (up), thinnest to be Z (depth)
+            let rotX = 0, rotZ = 0;
+            
+            if (tallest === 'z') {
+                // Z is tallest, rotate to make it Y
+                rotX = -Math.PI / 2;
+                log('Auto-rotate: X -90° (Z→Y)');
+            } else if (tallest === 'x') {
+                // X is tallest, rotate to make it Y
+                rotZ = Math.PI / 2;
+                log('Auto-rotate: Z +90° (X→Y)');
+            }
+            
+            // If after rotation the model is very flat in Z, it might be lying down
+            if (thinnest === 'y' && tallest !== 'y') {
+                rotX = -Math.PI / 2;
+                log('Auto-rotate: X -90° (flat model)');
+            }
+            
+            return { rotX, rotY: 0, rotZ };
+        }
+        
         // ============ MAIN APP ============
         class App {
             constructor() {
@@ -352,6 +576,15 @@
                 this.tracking = false;
                 this.faceCount = 0;
                 
+                // Mode system
+                this.mode = 'view'; // 'view' or 'edit'
+                this.modelRotation = { x: 0, y: 0, z: 0 };
+                this.baseRotation = { x: 0, y: 0, z: 0 }; // Store initial rotation
+                
+                // Touch rotation
+                this.touchStart = null;
+                this.lastTouchDist = 0;
+                
                 this.init();
             }
             
@@ -369,6 +602,9 @@
                     
                     log('Init UI...');
                     this.setupUI();
+                    
+                    log('Init touch rotation...');
+                    this.setupTouchRotation();
                     
                     log('Starting render...');
                     this.animate();
@@ -411,14 +647,12 @@
                 const gc = 0xff6600, gd = 0x1a0800;
                 const D = 400, W = 350, H = 250;
                 
-                // Floor
                 const floor = new THREE.GridHelper(W*2, 24, gc, gd);
                 floor.position.set(0, -H/2, -D/2);
                 floor.material.transparent = true;
                 floor.material.opacity = 0.7;
                 this.room.add(floor);
                 
-                // Back
                 const back = new THREE.GridHelper(W*2, 24, gc, gd);
                 back.rotation.x = Math.PI/2;
                 back.position.z = -D;
@@ -426,7 +660,6 @@
                 back.material.opacity = 0.6;
                 this.room.add(back);
                 
-                // Left
                 const left = new THREE.GridHelper(D, 16, gc, gd);
                 left.rotation.z = Math.PI/2;
                 left.position.set(-W, 0, -D/2);
@@ -434,7 +667,6 @@
                 left.material.opacity = 0.4;
                 this.room.add(left);
                 
-                // Right
                 const right = new THREE.GridHelper(D, 16, gc, gd);
                 right.rotation.z = Math.PI/2;
                 right.position.set(W, 0, -D/2);
@@ -442,14 +674,12 @@
                 right.material.opacity = 0.4;
                 this.room.add(right);
                 
-                // Ceiling
                 const ceil = new THREE.GridHelper(W*2, 24, gc, gd);
                 ceil.position.set(0, H/2, -D/2);
                 ceil.material.transparent = true;
                 ceil.material.opacity = 0.15;
                 this.room.add(ceil);
                 
-                // Corner lines
                 const lm = new THREE.LineBasicMaterial({color: gc, transparent: true, opacity: 0.5});
                 [[-W,-H/2],[W,-H/2],[-W,H/2],[W,H/2]].forEach(([x,y]) => {
                     const g = new THREE.BufferGeometry().setFromPoints([
@@ -458,7 +688,6 @@
                     this.room.add(new THREE.Line(g, lm));
                 });
                 
-                // Horizon
                 const hg = new THREE.PlaneGeometry(W*3, 4);
                 const hm = new THREE.MeshBasicMaterial({color: gc, transparent: true, opacity: 0.8});
                 const hz = new THREE.Mesh(hg, hm);
@@ -472,6 +701,10 @@
                 if (this.obj) this.scene.remove(this.obj);
                 $('modelInfo').classList.remove('show');
                 stat('sModel', type, 'ok');
+                
+                // Reset rotation for built-in objects
+                this.modelRotation = { x: 0, y: 0, z: 0 };
+                this.baseRotation = { x: 0, y: 0, z: 0 };
                 
                 const g = new THREE.Group();
                 
@@ -497,7 +730,7 @@
                     const heel = new THREE.Mesh(new THREE.BoxGeometry(16*s,35*s,22*s), new THREE.MeshPhysicalMaterial({color:0xffcc00}));
                     heel.position.set(-58*s,18*s,0); g.add(heel);
                     
-                    g.rotation.y = -0.35;
+                    this.baseRotation.y = -0.35;
                     g.position.set(0, 20, -80);
                     
                 } else if (type === 'cube') {
@@ -537,7 +770,18 @@
                         log('Parsing STL data...');
                         const geo = parseSTL(e.target.result);
                         
-                        // Center geometry
+                        // Auto-orient BEFORE centering
+                        const autoRot = autoOrientGeometry(geo);
+                        
+                        // Apply auto-rotation to geometry
+                        if (autoRot.rotX !== 0 || autoRot.rotZ !== 0) {
+                            const matrix = new THREE.Matrix4();
+                            const euler = new THREE.Euler(autoRot.rotX, autoRot.rotY, autoRot.rotZ);
+                            matrix.makeRotationFromEuler(euler);
+                            geo.applyMatrix4(matrix);
+                        }
+                        
+                        // Now center geometry
                         geo.computeBoundingBox();
                         const box = geo.boundingBox;
                         const center = new THREE.Vector3();
@@ -551,15 +795,12 @@
                         const scale = 150 / maxDim;
                         geo.scale(scale, scale, scale);
                         
-                        log(`Size: ${size.x.toFixed(0)}x${size.y.toFixed(0)}x${size.z.toFixed(0)}, scale: ${scale.toFixed(3)}`);
+                        log(`Final dims: ${(size.x*scale).toFixed(0)}x${(size.y*scale).toFixed(0)}x${(size.z*scale).toFixed(0)}`);
                         
-                        // Compute vertex normals for smooth shading
                         geo.computeVertexNormals();
                         
-                        // Remove old
                         if (this.obj) this.scene.remove(this.obj);
                         
-                        // Create mesh
                         const mat = new THREE.MeshPhysicalMaterial({
                             color: 0xff6600,
                             metalness: 0.3,
@@ -573,10 +814,13 @@
                         group.add(mesh);
                         group.position.z = -80;
                         
+                        // Reset rotation tracking for new model
+                        this.modelRotation = { x: 0, y: 0, z: 0 };
+                        this.baseRotation = { x: 0, y: 0, z: 0 };
+                        
                         this.obj = group;
                         this.scene.add(this.obj);
                         
-                        // Update UI
                         $('modelName').textContent = file.name;
                         $('modelInfo').classList.add('show');
                         document.querySelectorAll('.ob').forEach(b => b.classList.remove('on'));
@@ -601,6 +845,136 @@
                 };
                 
                 reader.readAsArrayBuffer(file);
+            }
+            
+            // ============ MODE SYSTEM ============
+            setMode(mode) {
+                this.mode = mode;
+                const btn = $('modeToggle');
+                const controls = $('rotControls');
+                const pip = $('pip');
+                const hint = $('editHint');
+                
+                if (mode === 'view') {
+                    btn.classList.remove('edit');
+                    btn.innerHTML = '<span class="icon">👁️</span><span class="label">VIEW MODE</span>';
+                    controls.classList.remove('show');
+                    pip.classList.remove('paused');
+                    stat('sMode', 'VIEW', 'ok');
+                    log('Mode: VIEW (parallax on)');
+                } else {
+                    btn.classList.add('edit');
+                    btn.innerHTML = '<span class="icon">✋</span><span class="label">EDIT MODE</span>';
+                    controls.classList.add('show');
+                    pip.classList.add('paused');
+                    stat('sMode', 'EDIT', 'w');
+                    log('Mode: EDIT (parallax paused)');
+                    
+                    // Show hint briefly
+                    hint.classList.add('show');
+                    setTimeout(() => hint.classList.remove('show'), 2000);
+                }
+            }
+            
+            toggleMode() {
+                this.setMode(this.mode === 'view' ? 'edit' : 'view');
+            }
+            
+            rotateModel(axis, angleDeg) {
+                const angle = (angleDeg * Math.PI) / 180;
+                this.modelRotation[axis] += angle;
+                log(`Rotate ${axis.toUpperCase()}: ${angleDeg > 0 ? '+' : ''}${angleDeg}°`);
+            }
+            
+            resetRotation() {
+                this.modelRotation = { x: 0, y: 0, z: 0 };
+                log('Rotation reset');
+            }
+            
+            // ============ TOUCH ROTATION ============
+            setupTouchRotation() {
+                const canvas = $('canvas3d');
+                
+                // Track touches
+                canvas.addEventListener('touchstart', (e) => {
+                    if (this.mode !== 'edit') return;
+                    
+                    if (e.touches.length === 2) {
+                        e.preventDefault();
+                        const t1 = e.touches[0];
+                        const t2 = e.touches[1];
+                        this.touchStart = {
+                            x: (t1.clientX + t2.clientX) / 2,
+                            y: (t1.clientY + t2.clientY) / 2,
+                            rotX: this.modelRotation.x,
+                            rotY: this.modelRotation.y
+                        };
+                        log('Touch rotate start');
+                    }
+                }, { passive: false });
+                
+                canvas.addEventListener('touchmove', (e) => {
+                    if (this.mode !== 'edit' || !this.touchStart) return;
+                    
+                    if (e.touches.length === 2) {
+                        e.preventDefault();
+                        const t1 = e.touches[0];
+                        const t2 = e.touches[1];
+                        const cx = (t1.clientX + t2.clientX) / 2;
+                        const cy = (t1.clientY + t2.clientY) / 2;
+                        
+                        const dx = cx - this.touchStart.x;
+                        const dy = cy - this.touchStart.y;
+                        
+                        // Convert drag to rotation
+                        const sensitivity = 0.01;
+                        this.modelRotation.y = this.touchStart.rotY + dx * sensitivity;
+                        this.modelRotation.x = this.touchStart.rotX + dy * sensitivity;
+                    }
+                }, { passive: false });
+                
+                canvas.addEventListener('touchend', () => {
+                    if (this.touchStart) {
+                        this.touchStart = null;
+                        log('Touch rotate end');
+                    }
+                });
+                
+                // Mouse fallback for desktop
+                let mouseDown = false;
+                let mouseStart = null;
+                
+                canvas.addEventListener('mousedown', (e) => {
+                    if (this.mode !== 'edit') return;
+                    mouseDown = true;
+                    mouseStart = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        rotX: this.modelRotation.x,
+                        rotY: this.modelRotation.y
+                    };
+                });
+                
+                canvas.addEventListener('mousemove', (e) => {
+                    if (!mouseDown || this.mode !== 'edit' || !mouseStart) return;
+                    
+                    const dx = e.clientX - mouseStart.x;
+                    const dy = e.clientY - mouseStart.y;
+                    
+                    const sensitivity = 0.005;
+                    this.modelRotation.y = mouseStart.rotY + dx * sensitivity;
+                    this.modelRotation.x = mouseStart.rotX + dy * sensitivity;
+                });
+                
+                canvas.addEventListener('mouseup', () => {
+                    mouseDown = false;
+                    mouseStart = null;
+                });
+                
+                canvas.addEventListener('mouseleave', () => {
+                    mouseDown = false;
+                    mouseStart = null;
+                });
             }
             
             async setupCamera() {
@@ -636,6 +1010,7 @@
                 log('Using touch fallback', 'w');
                 
                 const upd = (x, y) => {
+                    if (this.mode !== 'view') return; // Only track in view mode
                     this.face.x = -((x/innerWidth) - 0.5) * 400;
                     this.face.y = -((y/innerHeight) - 0.5) * 300;
                     this.tracking = true;
@@ -645,9 +1020,10 @@
                 
                 document.addEventListener('mousemove', e => upd(e.clientX, e.clientY));
                 document.addEventListener('touchmove', e => {
-                    e.preventDefault();
-                    upd(e.touches[0].clientX, e.touches[0].clientY);
-                }, { passive: false });
+                    if (e.touches.length === 1 && this.mode === 'view') {
+                        upd(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                }, { passive: true });
             }
             
             async setupTracking() {
@@ -658,7 +1034,6 @@
                 
                 stat('sTrack', '...', '');
                 
-                // Try MediaPipe
                 if (typeof FaceDetection !== 'undefined') {
                     try {
                         log('Trying MediaPipe...');
@@ -676,7 +1051,6 @@
                     }
                 }
                 
-                // Try Native
                 if ('FaceDetector' in window) {
                     try {
                         log('Trying Native...');
@@ -690,7 +1064,6 @@
                     }
                 }
                 
-                // Simple fallback
                 stat('sTrack', 'Simple', 'w');
                 log('Using simple tracking', 'w');
                 this.runSimple();
@@ -698,7 +1071,7 @@
             
             runDetection() {
                 const run = async () => {
-                    if (this.detector && this.vid.readyState >= 2) {
+                    if (this.detector && this.vid.readyState >= 2 && this.mode === 'view') {
                         try {
                             await this.detector.send({ image: this.vid });
                         } catch (e) {}
@@ -710,7 +1083,7 @@
             
             runNative() {
                 const run = async () => {
-                    if (this.nativeDetector && this.vid.readyState >= 2) {
+                    if (this.nativeDetector && this.vid.readyState >= 2 && this.mode === 'view') {
                         try {
                             const faces = await this.nativeDetector.detect(this.vid);
                             this.processNative(faces);
@@ -727,7 +1100,7 @@
                 const tc = tmp.getContext('2d');
                 
                 const run = () => {
-                    if (this.vid.readyState >= 2) {
+                    if (this.vid.readyState >= 2 && this.mode === 'view') {
                         tc.drawImage(this.vid, 0, 0, 64, 48);
                         const d = tc.getImageData(0, 0, 64, 48).data;
                         
@@ -761,6 +1134,8 @@
             }
             
             onFace(results) {
+                if (this.mode !== 'view') return;
+                
                 if (this.ctx) this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
                 
                 if (results.detections && results.detections.length > 0) {
@@ -788,6 +1163,8 @@
             }
             
             processNative(faces) {
+                if (this.mode !== 'view') return;
+                
                 if (this.ctx) this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
                 
                 if (faces.length > 0) {
@@ -879,6 +1256,21 @@
                     document.querySelector('.ob[data-o="sneaker"]').classList.add('on');
                 };
                 
+                // Mode toggle
+                $('modeToggle').onclick = () => this.toggleMode();
+                
+                // Rotation buttons
+                document.querySelectorAll('#rotControls button[data-axis]').forEach(btn => {
+                    btn.onclick = () => {
+                        const axis = btn.dataset.axis;
+                        const dir = parseInt(btn.dataset.dir);
+                        this.rotateModel(axis, dir * 90);
+                    };
+                });
+                
+                // Reset rotation
+                $('resetRot').onclick = () => this.resetRotation();
+                
                 // Resize
                 window.addEventListener('resize', () => {
                     this.camera.aspect = innerWidth / innerHeight;
@@ -890,9 +1282,12 @@
             }
             
             updateProjection() {
-                this.smooth.x += (this.face.x - this.smooth.x) * 0.1;
-                this.smooth.y += (this.face.y - this.smooth.y) * 0.1;
-                this.smooth.z += (this.face.z - this.smooth.z) * 0.1;
+                // Only update face tracking in view mode
+                if (this.mode === 'view') {
+                    this.smooth.x += (this.face.x - this.smooth.x) * 0.1;
+                    this.smooth.y += (this.face.y - this.smooth.y) * 0.1;
+                    this.smooth.z += (this.face.z - this.smooth.z) * 0.1;
+                }
                 
                 const { x, y, z } = this.smooth;
                 const asp = innerWidth / innerHeight;
@@ -913,8 +1308,13 @@
                 requestAnimationFrame(() => this.animate());
                 this.updateProjection();
                 
-                // Animate gem
-                if (this.obj && this.obj.children) {
+                // Apply rotation to object
+                if (this.obj) {
+                    this.obj.rotation.x = this.baseRotation.x + this.modelRotation.x;
+                    this.obj.rotation.y = this.baseRotation.y + this.modelRotation.y;
+                    this.obj.rotation.z = this.baseRotation.z + this.modelRotation.z;
+                    
+                    // Animate gem rings
                     this.obj.children.forEach(c => {
                         if (c.userData && c.userData.spd) {
                             c.rotation.z += c.userData.spd;
