@@ -327,7 +327,7 @@
         <button class="ob" data-o="cube">🎲</button>
         <button class="ob" data-o="gem">💎</button>
         <button id="uploadBtn">📁</button>
-        <input type="file" id="fileInput" accept=".stl,.STL" style="display:none">
+        <input type="file" id="fileInput" accept=".stl,.STL,.obj,.OBJ" style="display:none">
     </div>
     
     <div id="modelInfo">
@@ -488,6 +488,121 @@
                 const text = new TextDecoder().decode(buffer);
                 return parseASCII(text);
             }
+        }
+        
+        // ============ OBJ LOADER ============
+        function parseOBJ(text) {
+            log('Parsing OBJ...');
+            
+            const lines = text.split('\n');
+            const vertices = [];   // v x y z
+            const normals = [];    // vn x y z
+            const uvs = [];        // vt u v
+            
+            const outPositions = [];
+            const outNormals = [];
+            
+            let faceCount = 0;
+            
+            // First pass: collect all vertices, normals, uvs
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                const cmd = parts[0];
+                
+                if (cmd === 'v') {
+                    vertices.push([
+                        parseFloat(parts[1]) || 0,
+                        parseFloat(parts[2]) || 0,
+                        parseFloat(parts[3]) || 0
+                    ]);
+                } else if (cmd === 'vn') {
+                    normals.push([
+                        parseFloat(parts[1]) || 0,
+                        parseFloat(parts[2]) || 0,
+                        parseFloat(parts[3]) || 0
+                    ]);
+                } else if (cmd === 'vt') {
+                    uvs.push([
+                        parseFloat(parts[1]) || 0,
+                        parseFloat(parts[2]) || 0
+                    ]);
+                }
+            }
+            
+            log(`OBJ: ${vertices.length} verts, ${normals.length} normals`);
+            
+            // Helper: parse face index (handles 1-based, negative, v/vt/vn formats)
+            function parseFaceVertex(str) {
+                const parts = str.split('/');
+                let vi = parseInt(parts[0]) || 0;
+                let ti = parseInt(parts[1]) || 0;  // texture index (unused)
+                let ni = parseInt(parts[2]) || 0;  // normal index
+                
+                // Handle negative indices (relative to end)
+                if (vi < 0) vi = vertices.length + vi + 1;
+                if (ni < 0) ni = normals.length + ni + 1;
+                
+                // Convert to 0-based
+                return { v: vi - 1, n: ni - 1 };
+            }
+            
+            // Helper: add a triangle to output
+            function addTriangle(a, b, c) {
+                const va = vertices[a.v] || [0,0,0];
+                const vb = vertices[b.v] || [0,0,0];
+                const vc = vertices[c.v] || [0,0,0];
+                
+                outPositions.push(...va, ...vb, ...vc);
+                
+                // Use provided normals or compute face normal
+                if (a.n >= 0 && normals[a.n] && b.n >= 0 && normals[b.n] && c.n >= 0 && normals[c.n]) {
+                    outNormals.push(...normals[a.n], ...normals[b.n], ...normals[c.n]);
+                } else {
+                    // Compute face normal
+                    const u = [vb[0]-va[0], vb[1]-va[1], vb[2]-va[2]];
+                    const v = [vc[0]-va[0], vc[1]-va[1], vc[2]-va[2]];
+                    const n = [
+                        u[1]*v[2] - u[2]*v[1],
+                        u[2]*v[0] - u[0]*v[2],
+                        u[0]*v[1] - u[1]*v[0]
+                    ];
+                    const len = Math.sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]) || 1;
+                    n[0] /= len; n[1] /= len; n[2] /= len;
+                    outNormals.push(...n, ...n, ...n);
+                }
+                
+                faceCount++;
+            }
+            
+            // Second pass: process faces
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts[0] !== 'f') continue;
+                
+                // Parse all face vertices
+                const faceVerts = [];
+                for (let i = 1; i < parts.length; i++) {
+                    if (parts[i].length > 0) {
+                        faceVerts.push(parseFaceVertex(parts[i]));
+                    }
+                }
+                
+                if (faceVerts.length < 3) continue;
+                
+                // Triangulate using fan method
+                // Works well for convex polygons (tris, quads, most n-gons)
+                for (let i = 1; i < faceVerts.length - 1; i++) {
+                    addTriangle(faceVerts[0], faceVerts[i], faceVerts[i + 1]);
+                }
+            }
+            
+            log(`OBJ: ${faceCount} triangles`);
+            
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(outPositions, 3));
+            geo.setAttribute('normal', new THREE.Float32BufferAttribute(outNormals, 3));
+            
+            return geo;
         }
         
         // ============ AUTO-ORIENTATION ============
@@ -757,8 +872,9 @@
                 log(`Object: ${type}`);
             }
             
-            loadSTL(file) {
-                log(`Loading: ${file.name}`);
+            loadModel(file) {
+                const ext = file.name.split('.').pop().toLowerCase();
+                log(`Loading ${ext.toUpperCase()}: ${file.name}`);
                 $('loading').classList.add('show');
                 $('loadTxt').textContent = `Loading ${file.name}...`;
                 stat('sModel', 'loading...', 'w');
@@ -767,8 +883,18 @@
                 
                 reader.onload = (e) => {
                     try {
-                        log('Parsing STL data...');
-                        const geo = parseSTL(e.target.result);
+                        let geo;
+                        
+                        if (ext === 'obj') {
+                            // OBJ is text-based
+                            const text = typeof e.target.result === 'string' 
+                                ? e.target.result 
+                                : new TextDecoder().decode(e.target.result);
+                            geo = parseOBJ(text);
+                        } else {
+                            // STL can be binary or ASCII
+                            geo = parseSTL(e.target.result);
+                        }
                         
                         // Auto-orient BEFORE centering
                         const autoRot = autoOrientGeometry(geo);
@@ -832,8 +958,8 @@
                     } catch (err) {
                         $('loading').classList.remove('show');
                         stat('sModel', 'ERROR', 'err');
-                        log(`STL Error: ${err.message}`, 'e');
-                        alert('Error loading STL:\n' + err.message);
+                        log(`Load Error: ${err.message}`, 'e');
+                        alert(`Error loading ${ext.toUpperCase()}:\n` + err.message);
                     }
                 };
                 
@@ -844,7 +970,12 @@
                     alert('Error reading file');
                 };
                 
-                reader.readAsArrayBuffer(file);
+                // Read as appropriate type
+                if (ext === 'obj') {
+                    reader.readAsText(file);
+                } else {
+                    reader.readAsArrayBuffer(file);
+                }
             }
             
             // ============ MODE SYSTEM ============
@@ -1245,7 +1376,7 @@
                     const file = e.target.files[0];
                     if (file) {
                         log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
-                        this.loadSTL(file);
+                        this.loadModel(file);
                     }
                     e.target.value = '';
                 };
