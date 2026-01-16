@@ -238,6 +238,117 @@
             margin-bottom: 8px;
         }
         
+        /* Gesture status badge */
+        #gestureStatus {
+            position: fixed;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #444;
+            border-radius: 20px;
+            padding: 8px 16px;
+            color: #fff;
+            font-size: 13px;
+            z-index: 160;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        #gestureStatus.show { display: flex; }
+        #gestureStatus.fist { border-color: #ff6600; background: rgba(255,102,0,0.2); }
+        #gestureStatus.pinch { border-color: #00ff88; background: rgba(0,255,136,0.2); }
+        #gestureStatus.palm { border-color: #ff4488; background: rgba(255,68,136,0.2); }
+        #gestureStatus .icon { font-size: 18px; }
+        #gestureStatus .progress {
+            position: absolute;
+            bottom: 0;
+            left: 10px;
+            right: 10px;
+            height: 3px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #gestureStatus .progress::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: var(--progress, 0%);
+            background: #ff4488;
+            transition: width 0.1s;
+        }
+        
+        /* Gesture help overlay */
+        #gestureHelp {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 600;
+        }
+        #gestureHelp.show { display: flex; }
+        #gestureHelp .help-content {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            max-width: 280px;
+        }
+        #gestureHelp h3 {
+            color: #fff;
+            margin: 0 0 16px 0;
+            font-size: 18px;
+        }
+        #gestureHelp .gesture-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            color: #ccc;
+            font-size: 14px;
+            border-bottom: 1px solid #333;
+        }
+        #gestureHelp .gesture-row:last-of-type { border-bottom: none; }
+        #gestureHelp .gesture-row span { font-size: 24px; width: 36px; }
+        #gestureHelp button {
+            margin-top: 20px;
+            background: #ff6600;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 24px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        /* Help button */
+        #helpBtn {
+            position: fixed;
+            bottom: 24px;
+            right: 140px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 150;
+            display: none;
+        }
+        #helpBtn.show { display: block; }
+        
         /* Model info */
         #modelInfo {
             position: fixed;
@@ -370,6 +481,27 @@
         <div>Two-finger drag to rotate</div>
     </div>
     
+    <!-- Gesture status badge -->
+    <div id="gestureStatus">
+        <span class="icon">👋</span>
+        <span class="text">Show hand</span>
+        <div class="progress"></div>
+    </div>
+    
+    <!-- Gesture help overlay -->
+    <div id="gestureHelp">
+        <div class="help-content">
+            <h3>✋ Hand Gestures</h3>
+            <div class="gesture-row"><span>✊</span> Fist + drag → Rotate</div>
+            <div class="gesture-row"><span>🤏</span> Pinch spread → Scale</div>
+            <div class="gesture-row"><span>✋</span> Palm hold 2s → Reset</div>
+            <button id="closeHelp">Got it!</button>
+        </div>
+    </div>
+    
+    <!-- Help button (shown in edit mode) -->
+    <button id="helpBtn">?</button>
+    
     <div id="loading">
         <div class="spin"></div>
         <p id="loadTxt">Loading...</p>
@@ -377,6 +509,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     
     <script>
     (function() {
@@ -605,6 +738,480 @@
             return geo;
         }
         
+        // ============ HAND CONTROLLER ============
+        class HandController {
+            constructor(app) {
+                this.app = app;
+                this.hands = null;
+                this.ready = false;
+                this.active = false;
+                
+                // State machine
+                this.state = 'IDLE'; // IDLE, TRACKING, FIST, PINCH, PALM
+                this.prevState = 'IDLE';
+                this.stateStartTime = 0;
+                
+                // Gesture detection with hysteresis
+                this.gestureBuffer = [];
+                this.gestureBufferSize = 5; // Frames to average
+                this.gestureHoldTime = 150; // ms to confirm gesture change
+                this.pendingGesture = null;
+                this.pendingGestureStart = 0;
+                
+                // Tracking data
+                this.landmarks = null;
+                this.handCenter = { x: 0.5, y: 0.5 };
+                this.prevHandCenter = { x: 0.5, y: 0.5 };
+                this.pinchDistance = 0;
+                this.prevPinchDistance = 0;
+                this.palmHoldStart = 0;
+                
+                // Smoothing
+                this.smoothRotX = 0;
+                this.smoothRotY = 0;
+                this.smoothScale = 1;
+                
+                // UI elements
+                this.statusEl = $('gestureStatus');
+                this.statusIcon = this.statusEl.querySelector('.icon');
+                this.statusText = this.statusEl.querySelector('.text');
+                this.progressEl = this.statusEl.querySelector('.progress');
+                
+                // Idle hint timer
+                this.idleTimer = null;
+                this.hintShown = false;
+            }
+            
+            async init() {
+                if (typeof Hands === 'undefined') {
+                    log('MediaPipe Hands not available', 'e');
+                    return false;
+                }
+                
+                try {
+                    log('Initializing hand tracking...');
+                    this.hands = new Hands({
+                        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+                    });
+                    
+                    this.hands.setOptions({
+                        maxNumHands: 1,
+                        modelComplexity: 0, // 0 = lite, fastest
+                        minDetectionConfidence: 0.6,
+                        minTrackingConfidence: 0.5
+                    });
+                    
+                    this.hands.onResults(r => this.onResults(r));
+                    
+                    this.ready = true;
+                    log('Hand tracking ready', 'ok');
+                    return true;
+                } catch (err) {
+                    log(`Hand init failed: ${err.message}`, 'e');
+                    return false;
+                }
+            }
+            
+            start() {
+                if (!this.ready) return;
+                this.active = true;
+                this.state = 'IDLE';
+                this.showStatus('👋', 'Show hand');
+                this.statusEl.classList.add('show');
+                $('helpBtn').classList.add('show');
+                
+                // Start idle hint timer
+                this.startIdleTimer();
+                
+                log('Hand control started');
+                this.runDetection();
+            }
+            
+            stop() {
+                this.active = false;
+                this.state = 'IDLE';
+                this.statusEl.classList.remove('show');
+                this.statusEl.className = 'show'; // Reset classes
+                $('helpBtn').classList.remove('show');
+                this.clearIdleTimer();
+                log('Hand control stopped');
+            }
+            
+            startIdleTimer() {
+                this.clearIdleTimer();
+                this.idleTimer = setTimeout(() => {
+                    if (this.active && this.state === 'IDLE' && !this.hintShown) {
+                        this.hintShown = true;
+                        $('gestureHelp').classList.add('show');
+                    }
+                }, 4000);
+            }
+            
+            clearIdleTimer() {
+                if (this.idleTimer) {
+                    clearTimeout(this.idleTimer);
+                    this.idleTimer = null;
+                }
+            }
+            
+            runDetection() {
+                if (!this.active || !this.hands || !this.app.vid) return;
+                
+                const detect = async () => {
+                    if (!this.active) return;
+                    
+                    if (this.app.vid.readyState >= 2) {
+                        try {
+                            await this.hands.send({ image: this.app.vid });
+                        } catch (e) {
+                            // Silently ignore send errors
+                        }
+                    }
+                    
+                    if (this.active) {
+                        requestAnimationFrame(detect);
+                    }
+                };
+                
+                detect();
+            }
+            
+            onResults(results) {
+                if (!this.active) return;
+                
+                // Clear PIP overlay
+                const ctx = this.app.ctx;
+                const ovr = this.app.ovr;
+                if (ctx) ctx.clearRect(0, 0, ovr.width, ovr.height);
+                
+                // Check for hand
+                if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                    this.handleNoHand();
+                    return;
+                }
+                
+                // Store landmarks
+                this.landmarks = results.multiHandLandmarks[0];
+                
+                // Draw hand skeleton
+                this.drawHand(ctx, ovr);
+                
+                // Detect gesture
+                const gesture = this.detectGesture();
+                
+                // Apply hysteresis
+                this.processGestureWithHysteresis(gesture);
+            }
+            
+            handleNoHand() {
+                this.landmarks = null;
+                
+                // Only go to IDLE if we've been without a hand for a bit
+                if (this.state !== 'IDLE') {
+                    this.gestureBuffer.push('NONE');
+                    if (this.gestureBuffer.length > this.gestureBufferSize) {
+                        this.gestureBuffer.shift();
+                    }
+                    
+                    const noneCount = this.gestureBuffer.filter(g => g === 'NONE').length;
+                    if (noneCount >= this.gestureBufferSize - 1) {
+                        this.setState('IDLE');
+                        this.showStatus('👋', 'Show hand');
+                    }
+                }
+            }
+            
+            detectGesture() {
+                if (!this.landmarks) return 'NONE';
+                
+                const lm = this.landmarks;
+                
+                // Key landmarks (MediaPipe hand indices)
+                const WRIST = 0;
+                const THUMB_TIP = 4;
+                const INDEX_TIP = 8;
+                const INDEX_MCP = 5;
+                const MIDDLE_TIP = 12;
+                const MIDDLE_MCP = 9;
+                const RING_TIP = 16;
+                const RING_MCP = 13;
+                const PINKY_TIP = 20;
+                const PINKY_MCP = 17;
+                
+                // Helper: distance between two landmarks
+                const dist = (a, b) => {
+                    const dx = lm[a].x - lm[b].x;
+                    const dy = lm[a].y - lm[b].y;
+                    return Math.sqrt(dx*dx + dy*dy);
+                };
+                
+                // Helper: check if finger is curled
+                const isCurled = (tip, mcp) => {
+                    // Finger is curled if tip is below (higher y) than MCP
+                    // and close horizontally
+                    const tipY = lm[tip].y;
+                    const mcpY = lm[mcp].y;
+                    const wristY = lm[WRIST].y;
+                    
+                    // Normalized: is tip closer to wrist than MCP is?
+                    return tipY > mcpY - 0.05;
+                };
+                
+                // Calculate hand center (average of palm landmarks)
+                const palmIndices = [0, 5, 9, 13, 17];
+                let cx = 0, cy = 0;
+                palmIndices.forEach(i => { cx += lm[i].x; cy += lm[i].y; });
+                this.prevHandCenter = { ...this.handCenter };
+                this.handCenter = { x: cx / 5, y: cy / 5 };
+                
+                // Calculate pinch distance
+                this.prevPinchDistance = this.pinchDistance;
+                this.pinchDistance = dist(THUMB_TIP, INDEX_TIP);
+                
+                // ===== GESTURE DETECTION =====
+                
+                // 1. PINCH: Thumb and index very close
+                const pinchThreshold = 0.08;
+                if (this.pinchDistance < pinchThreshold) {
+                    return 'PINCH';
+                }
+                
+                // 2. FIST: All fingers curled
+                const fingersCurled = [
+                    isCurled(INDEX_TIP, INDEX_MCP),
+                    isCurled(MIDDLE_TIP, MIDDLE_MCP),
+                    isCurled(RING_TIP, RING_MCP),
+                    isCurled(PINKY_TIP, PINKY_MCP)
+                ];
+                const curledCount = fingersCurled.filter(Boolean).length;
+                
+                if (curledCount >= 3 && this.pinchDistance < 0.15) {
+                    return 'FIST';
+                }
+                
+                // 3. PALM: All fingers extended
+                const fingersExtended = fingersCurled.map(c => !c);
+                const extendedCount = fingersExtended.filter(Boolean).length;
+                
+                // Also check thumb is away from palm
+                const thumbAway = dist(THUMB_TIP, INDEX_MCP) > 0.1;
+                
+                if (extendedCount >= 3 && thumbAway) {
+                    return 'PALM';
+                }
+                
+                // Default: just tracking, no specific gesture
+                return 'TRACKING';
+            }
+            
+            processGestureWithHysteresis(gesture) {
+                const now = Date.now();
+                
+                // Add to buffer
+                this.gestureBuffer.push(gesture);
+                if (this.gestureBuffer.length > this.gestureBufferSize) {
+                    this.gestureBuffer.shift();
+                }
+                
+                // Find most common gesture in buffer
+                const counts = {};
+                this.gestureBuffer.forEach(g => { counts[g] = (counts[g] || 0) + 1; });
+                
+                let dominantGesture = 'TRACKING';
+                let maxCount = 0;
+                for (const g in counts) {
+                    if (counts[g] > maxCount) {
+                        maxCount = counts[g];
+                        dominantGesture = g;
+                    }
+                }
+                
+                // Hysteresis: require gesture to be stable before switching
+                if (dominantGesture !== this.pendingGesture) {
+                    this.pendingGesture = dominantGesture;
+                    this.pendingGestureStart = now;
+                } else if (now - this.pendingGestureStart > this.gestureHoldTime) {
+                    // Gesture held long enough, apply it
+                    if (dominantGesture !== this.state && dominantGesture !== 'NONE') {
+                        this.setState(dominantGesture);
+                    }
+                }
+                
+                // Apply gesture actions (continuous)
+                this.applyGestureAction();
+            }
+            
+            setState(newState) {
+                if (newState === this.state) return;
+                
+                this.prevState = this.state;
+                this.state = newState;
+                this.stateStartTime = Date.now();
+                
+                log(`Gesture: ${newState}`);
+                
+                // Update UI
+                this.statusEl.classList.remove('fist', 'pinch', 'palm');
+                
+                switch (newState) {
+                    case 'IDLE':
+                        this.showStatus('👋', 'Show hand');
+                        this.startIdleTimer();
+                        break;
+                    case 'TRACKING':
+                        this.showStatus('✋', 'Tracking...');
+                        this.clearIdleTimer();
+                        break;
+                    case 'FIST':
+                        this.showStatus('✊', 'Rotate');
+                        this.statusEl.classList.add('fist');
+                        this.clearIdleTimer();
+                        break;
+                    case 'PINCH':
+                        this.showStatus('🤏', 'Scale');
+                        this.statusEl.classList.add('pinch');
+                        this.clearIdleTimer();
+                        // Store initial scale
+                        this.smoothScale = 1;
+                        break;
+                    case 'PALM':
+                        this.palmHoldStart = Date.now();
+                        this.showStatus('✋', 'Hold to reset');
+                        this.statusEl.classList.add('palm');
+                        this.clearIdleTimer();
+                        break;
+                }
+            }
+            
+            applyGestureAction() {
+                if (!this.landmarks) return;
+                
+                switch (this.state) {
+                    case 'FIST':
+                        this.applyRotation();
+                        break;
+                    case 'PINCH':
+                        this.applyScale();
+                        break;
+                    case 'PALM':
+                        this.checkPalmReset();
+                        break;
+                }
+            }
+            
+            applyRotation() {
+                // Calculate hand movement delta
+                const dx = this.handCenter.x - this.prevHandCenter.x;
+                const dy = this.handCenter.y - this.prevHandCenter.y;
+                
+                // Ignore tiny movements (noise)
+                if (Math.abs(dx) < 0.002 && Math.abs(dy) < 0.002) return;
+                
+                // Apply rotation (inverted X because camera is mirrored)
+                const sensitivity = 3;
+                this.app.modelRotation.y += dx * sensitivity;
+                this.app.modelRotation.x += dy * sensitivity;
+            }
+            
+            applyScale() {
+                // Calculate pinch delta
+                const delta = this.pinchDistance - this.prevPinchDistance;
+                
+                // Ignore tiny changes
+                if (Math.abs(delta) < 0.003) return;
+                
+                // Apply scale
+                const sensitivity = 8;
+                const scaleDelta = delta * sensitivity;
+                
+                // Update model scale with limits
+                if (this.app.obj) {
+                    const currentScale = this.app.obj.scale.x;
+                    const newScale = Math.max(0.3, Math.min(3, currentScale + scaleDelta));
+                    this.app.obj.scale.setScalar(newScale);
+                    
+                    // Update status text with percentage
+                    const pct = Math.round(newScale * 100);
+                    this.showStatus('🤏', `Scale ${pct}%`);
+                }
+            }
+            
+            checkPalmReset() {
+                const holdDuration = 2000; // 2 seconds
+                const elapsed = Date.now() - this.palmHoldStart;
+                const progress = Math.min(100, (elapsed / holdDuration) * 100);
+                
+                // Update progress bar
+                this.progressEl.style.setProperty('--progress', `${progress}%`);
+                
+                if (elapsed >= holdDuration) {
+                    // Reset!
+                    this.app.resetRotation();
+                    if (this.app.obj) {
+                        this.app.obj.scale.setScalar(1);
+                    }
+                    this.showStatus('↺', 'Reset!');
+                    this.palmHoldStart = Date.now() + 1000; // Prevent immediate re-trigger
+                    log('Transform reset via palm hold');
+                    
+                    // Brief feedback
+                    setTimeout(() => {
+                        if (this.state === 'PALM') {
+                            this.showStatus('✋', 'Hold to reset');
+                        }
+                    }, 500);
+                }
+            }
+            
+            showStatus(icon, text) {
+                this.statusIcon.textContent = icon;
+                this.statusText.textContent = text;
+            }
+            
+            drawHand(ctx, ovr) {
+                if (!ctx || !this.landmarks) return;
+                
+                const lm = this.landmarks;
+                const w = ovr.width;
+                const h = ovr.height;
+                
+                ctx.save();
+                ctx.translate(w, 0);
+                ctx.scale(-1, 1); // Mirror
+                
+                // Draw connections
+                const connections = [
+                    [0,1],[1,2],[2,3],[3,4],       // Thumb
+                    [0,5],[5,6],[6,7],[7,8],       // Index
+                    [0,9],[9,10],[10,11],[11,12], // Middle
+                    [0,13],[13,14],[14,15],[15,16], // Ring
+                    [0,17],[17,18],[18,19],[19,20], // Pinky
+                    [5,9],[9,13],[13,17]            // Palm
+                ];
+                
+                ctx.strokeStyle = '#ff6600';
+                ctx.lineWidth = 2;
+                
+                connections.forEach(([a, b]) => {
+                    ctx.beginPath();
+                    ctx.moveTo(lm[a].x * w, lm[a].y * h);
+                    ctx.lineTo(lm[b].x * w, lm[b].y * h);
+                    ctx.stroke();
+                });
+                
+                // Draw landmarks
+                ctx.fillStyle = '#fff';
+                lm.forEach((point, i) => {
+                    ctx.beginPath();
+                    const size = [4, 8, 12, 16, 20].includes(i) ? 4 : 2; // Fingertips larger
+                    ctx.arc(point.x * w, point.y * h, size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                ctx.restore();
+            }
+        }
+        
         // ============ AUTO-ORIENTATION ============
         function autoOrientGeometry(geo) {
             geo.computeBoundingBox();
@@ -700,6 +1307,9 @@
                 this.touchStart = null;
                 this.lastTouchDist = 0;
                 
+                // Hand controller
+                this.handController = null;
+                
                 this.init();
             }
             
@@ -720,6 +1330,10 @@
                     
                     log('Init touch rotation...');
                     this.setupTouchRotation();
+                    
+                    log('Init hand controller...');
+                    this.handController = new HandController(this);
+                    await this.handController.init();
                     
                     log('Starting render...');
                     this.animate();
@@ -993,6 +1607,11 @@
                     pip.classList.remove('paused');
                     stat('sMode', 'VIEW', 'ok');
                     log('Mode: VIEW (parallax on)');
+                    
+                    // Stop hand controller
+                    if (this.handController) {
+                        this.handController.stop();
+                    }
                 } else {
                     btn.classList.add('edit');
                     btn.innerHTML = '<span class="icon">✋</span><span class="label">EDIT MODE</span>';
@@ -1001,9 +1620,14 @@
                     stat('sMode', 'EDIT', 'w');
                     log('Mode: EDIT (parallax paused)');
                     
-                    // Show hint briefly
-                    hint.classList.add('show');
-                    setTimeout(() => hint.classList.remove('show'), 2000);
+                    // Start hand controller
+                    if (this.handController && this.handController.ready) {
+                        this.handController.start();
+                    } else {
+                        // Show hint for touch controls if no hand tracking
+                        hint.classList.add('show');
+                        setTimeout(() => hint.classList.remove('show'), 2000);
+                    }
                 }
             }
             
@@ -1401,6 +2025,16 @@
                 
                 // Reset rotation
                 $('resetRot').onclick = () => this.resetRotation();
+                
+                // Help button
+                $('helpBtn').onclick = () => {
+                    $('gestureHelp').classList.add('show');
+                };
+                
+                // Close help
+                $('closeHelp').onclick = () => {
+                    $('gestureHelp').classList.remove('show');
+                };
                 
                 // Resize
                 window.addEventListener('resize', () => {
