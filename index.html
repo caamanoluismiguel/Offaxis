@@ -349,6 +349,12 @@
         }
         #helpBtn.show { display: block; }
         
+        /* Tutorial popup animation */
+        @keyframes tutorialPop {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        
         /* Model info */
         #modelInfo {
             position: fixed;
@@ -493,8 +499,8 @@
         <div class="help-content">
             <h3>✋ Hand Gestures</h3>
             <div class="gesture-row"><span>✊</span> Fist + drag → Rotate</div>
-            <div class="gesture-row"><span>🤏</span> Pinch spread → Scale</div>
-            <div class="gesture-row"><span>✋</span> Palm hold 2s → Reset</div>
+            <div class="gesture-row"><span>🤏</span> Pinch + drag ↕ → Scale</div>
+            <div class="gesture-row"><span>✋</span> Open hand → Exit / Reset (hold 2s)</div>
             <button id="closeHelp">Got it!</button>
         </div>
     </div>
@@ -766,6 +772,15 @@
                 this.prevPinchDistance = 0;
                 this.palmHoldStart = 0;
                 
+                // Pinch-drag scale tracking
+                this.scaleStartY = 0;        // Y position when pinch started
+                this.scaleStartValue = 1;    // Model scale when pinch started
+                this.pinchLocked = false;    // Stay in PINCH until explicit exit
+                this.lastScaleDirection = 0; // -1 down, 0 neutral, 1 up
+                
+                // First-time hints
+                this.hasShownScaleHint = false;
+                
                 // Smoothing
                 this.smoothRotX = 0;
                 this.smoothRotY = 0;
@@ -830,6 +845,7 @@
             stop() {
                 this.active = false;
                 this.state = 'IDLE';
+                this.pinchLocked = false; // Reset lock state
                 this.statusEl.classList.remove('show');
                 this.statusEl.className = 'show'; // Reset classes
                 $('helpBtn').classList.remove('show');
@@ -968,15 +984,7 @@
                 this.prevPinchDistance = this.pinchDistance;
                 this.pinchDistance = dist(THUMB_TIP, INDEX_TIP);
                 
-                // ===== GESTURE DETECTION =====
-                
-                // 1. PINCH: Thumb and index very close
-                const pinchThreshold = 0.08;
-                if (this.pinchDistance < pinchThreshold) {
-                    return 'PINCH';
-                }
-                
-                // 2. FIST: All fingers curled
+                // Calculate finger states (needed for multiple gesture detections)
                 const fingersCurled = [
                     isCurled(INDEX_TIP, INDEX_MCP),
                     isCurled(MIDDLE_TIP, MIDDLE_MCP),
@@ -985,19 +993,34 @@
                 ];
                 const curledCount = fingersCurled.filter(Boolean).length;
                 
-                if (curledCount >= 3 && this.pinchDistance < 0.15) {
-                    return 'FIST';
-                }
+                // ===== GESTURE DETECTION =====
                 
-                // 3. PALM: All fingers extended
+                // Check for PALM first (exit gesture - always takes priority)
+                // 3. PALM: All fingers extended - this is how you EXIT pinch/fist
                 const fingersExtended = fingersCurled.map(c => !c);
                 const extendedCount = fingersExtended.filter(Boolean).length;
-                
-                // Also check thumb is away from palm
                 const thumbAway = dist(THUMB_TIP, INDEX_MCP) > 0.1;
                 
-                if (extendedCount >= 3 && thumbAway) {
+                if (extendedCount >= 4 && thumbAway) {
+                    // Open hand detected - release any locks
+                    this.pinchLocked = false;
                     return 'PALM';
+                }
+                
+                // If we're locked in PINCH, stay there until PALM exit
+                if (this.pinchLocked && this.state === 'PINCH') {
+                    return 'PINCH';
+                }
+                
+                // 1. PINCH: Thumb and index very close (entry gesture)
+                const pinchThreshold = 0.08;
+                if (this.pinchDistance < pinchThreshold) {
+                    return 'PINCH';
+                }
+                
+                // 2. FIST: All fingers curled
+                if (curledCount >= 3 && this.pinchDistance < 0.15) {
+                    return 'FIST';
                 }
                 
                 // Default: just tracking, no specific gesture
@@ -1068,11 +1091,22 @@
                         this.clearIdleTimer();
                         break;
                     case 'PINCH':
-                        this.showStatus('🤏', 'Scale');
+                        // Lock pinch mode and record starting values
+                        this.pinchLocked = true;
+                        this.scaleStartY = this.handCenter.y;
+                        this.scaleStartValue = this.app.obj ? this.app.obj.scale.x : 1;
+                        this.lastScaleDirection = 0;
+                        
+                        // Show feedforward hint
+                        this.showStatus('🤏', 'Scale ↕');
                         this.statusEl.classList.add('pinch');
                         this.clearIdleTimer();
-                        // Store initial scale
-                        this.smoothScale = 1;
+                        
+                        // Show first-time tutorial
+                        if (!this.hasShownScaleHint) {
+                            this.hasShownScaleHint = true;
+                            this.showScaleTutorial();
+                        }
                         break;
                     case 'PALM':
                         this.palmHoldStart = Date.now();
@@ -1114,26 +1148,80 @@
             }
             
             applyScale() {
-                // Calculate pinch delta
-                const delta = this.pinchDistance - this.prevPinchDistance;
+                // Use vertical hand position for scaling (not pinch distance!)
+                // Moving hand UP = scale up, moving hand DOWN = scale down
                 
-                // Ignore tiny changes
-                if (Math.abs(delta) < 0.003) return;
+                if (!this.app.obj) return;
                 
-                // Apply scale
-                const sensitivity = 8;
-                const scaleDelta = delta * sensitivity;
+                // Calculate Y delta from start position
+                // Note: Y increases downward in screen coords, so we invert
+                const deltaY = this.scaleStartY - this.handCenter.y;
                 
-                // Update model scale with limits
-                if (this.app.obj) {
-                    const currentScale = this.app.obj.scale.x;
-                    const newScale = Math.max(0.3, Math.min(3, currentScale + scaleDelta));
-                    this.app.obj.scale.setScalar(newScale);
-                    
-                    // Update status text with percentage
-                    const pct = Math.round(newScale * 100);
-                    this.showStatus('🤏', `Scale ${pct}%`);
+                // Convert to scale multiplier
+                // Moving hand 0.3 units (30% of screen) = 2x scale change
+                const sensitivity = 4;
+                const scaleMultiplier = 1 + (deltaY * sensitivity);
+                
+                // Apply to starting scale value
+                const newScale = Math.max(0.2, Math.min(4, this.scaleStartValue * scaleMultiplier));
+                this.app.obj.scale.setScalar(newScale);
+                
+                // Determine direction for feedback
+                const pct = Math.round(newScale * 100);
+                let arrow = '';
+                if (deltaY > 0.02) {
+                    arrow = ' ▲';
+                    this.lastScaleDirection = 1;
+                } else if (deltaY < -0.02) {
+                    arrow = ' ▼';
+                    this.lastScaleDirection = -1;
+                } else {
+                    this.lastScaleDirection = 0;
                 }
+                
+                // Update status with percentage and direction
+                this.showStatus('🤏', `${pct}%${arrow}`);
+            }
+            
+            showScaleTutorial() {
+                // Create temporary tutorial overlay
+                const tutorial = document.createElement('div');
+                tutorial.id = 'scaleTutorial';
+                tutorial.innerHTML = `
+                    <div class="tutorial-content">
+                        <div class="tutorial-gesture">🤏</div>
+                        <div class="tutorial-arrows">↑ ↓</div>
+                        <div class="tutorial-text">Drag hand up/down to scale</div>
+                        <div class="tutorial-hint">Open hand ✋ to exit</div>
+                    </div>
+                `;
+                tutorial.style.cssText = `
+                    position: fixed;
+                    top: 50%; left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0,200,100,0.95);
+                    border-radius: 16px;
+                    padding: 20px 28px;
+                    z-index: 700;
+                    text-align: center;
+                    animation: tutorialPop 0.3s ease-out;
+                `;
+                tutorial.querySelector('.tutorial-content').style.cssText = `color: #fff;`;
+                tutorial.querySelector('.tutorial-gesture').style.cssText = `font-size: 36px; margin-bottom: 4px;`;
+                tutorial.querySelector('.tutorial-arrows').style.cssText = `font-size: 24px; margin-bottom: 8px; letter-spacing: 8px;`;
+                tutorial.querySelector('.tutorial-text').style.cssText = `font-size: 14px; font-weight: 600;`;
+                tutorial.querySelector('.tutorial-hint').style.cssText = `font-size: 11px; opacity: 0.8; margin-top: 8px;`;
+                
+                document.body.appendChild(tutorial);
+                
+                // Auto-remove after 2.5 seconds
+                setTimeout(() => {
+                    if (tutorial.parentNode) {
+                        tutorial.style.opacity = '0';
+                        tutorial.style.transition = 'opacity 0.3s';
+                        setTimeout(() => tutorial.remove(), 300);
+                    }
+                }, 2500);
             }
             
             checkPalmReset() {
