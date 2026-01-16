@@ -4,38 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>OffAxis 3D + STL</title>
+    <title>OffAxis 3D</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #000;
-            overflow: hidden;
-            font-family: -apple-system, sans-serif;
-            touch-action: none;
+        :root {
+            --bg: #08080c;
+            --primary: #ff6a00;
+            --primary-dim: rgba(255,106,0,0.3);
+            --accent: #00f0ff;
+            --success: #00ff88;
+            --danger: #ff4466;
+            --text: #ffffff;
+            --text-dim: #666;
+            --panel: rgba(12,12,18,0.9);
+            --border: rgba(255,255,255,0.1);
         }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: var(--bg);
+            overflow: hidden;
+            font-family: 'SF Pro Display', -apple-system, system-ui, sans-serif;
+            touch-action: none;
+            color: var(--text);
+        }
+        
         #canvas3d {
             width: 100vw;
             height: 100vh;
             display: block;
         }
         
-        /* PIP */
+        /* ===== PIP Camera ===== */
         #pip {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 100px;
-            height: 130px;
-            border-radius: 10px;
+            bottom: 24px;
+            right: 24px;
+            width: 120px;
+            height: 90px;
+            border-radius: 16px;
             overflow: hidden;
             z-index: 100;
             background: #000;
-            border: 2px solid rgba(255,102,0,0.5);
-            transition: opacity 0.3s, border-color 0.3s;
+            border: 2px solid var(--primary-dim);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
         }
-        #pip.paused {
-            opacity: 0.4;
-            border-color: rgba(255,255,255,0.3);
+        #pip:hover { transform: scale(1.05); }
+        #pip.edit-mode {
+            border-color: var(--success);
+            box-shadow: 0 8px 32px rgba(0,255,136,0.2);
         }
         #pip video {
             width: 100%;
@@ -50,336 +68,353 @@
             height: 100%;
             pointer-events: none;
         }
-        #dot {
+        #pip .status {
             position: absolute;
-            top: 6px; left: 6px;
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: #ff3b30;
-        }
-        #dot.on { background: #30d158; box-shadow: 0 0 8px #30d158; }
-        
-        /* Status panel */
-        #status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.85);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 10px;
-            color: #fff;
-            z-index: 100;
-            min-width: 120px;
-            font-family: monospace;
-        }
-        #status div { margin: 3px 0; display: flex; justify-content: space-between; gap: 10px; }
-        #status .v { color: #ff6600; }
-        #status .ok { color: #30d158; }
-        #status .err { color: #ff3b30; }
-        
-        /* Objects panel */
-        #objs {
-            position: fixed;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 100;
-        }
-        .ob {
-            width: 46px; height: 46px;
-            border-radius: 12px;
-            border: none;
-            background: rgba(255,255,255,0.08);
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        .ob.on { 
-            background: rgba(255,102,0,0.25); 
-            box-shadow: 0 0 0 2px #ff6600;
-        }
-        
-        /* Upload button */
-        #uploadBtn {
-            width: 46px; height: 46px;
-            border-radius: 12px;
-            border: 2px dashed rgba(255,102,0,0.5);
-            background: rgba(255,102,0,0.1);
-            color: #ff6600;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        #uploadBtn:active {
-            background: rgba(255,102,0,0.3);
-        }
-        
-        /* Mode Toggle Button */
-        #modeToggle {
-            position: fixed;
-            bottom: 20px;
+            bottom: 6px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(255,102,0,0.9);
-            border: none;
-            border-radius: 25px;
-            padding: 12px 24px;
-            color: #fff;
-            font-size: 14px;
+            font-size: 9px;
             font-weight: 600;
-            cursor: pointer;
-            z-index: 200;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 20px rgba(255,102,0,0.4);
-            transition: all 0.3s;
+            padding: 2px 8px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.7);
+            color: var(--success);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        #modeToggle:active {
-            transform: translateX(-50%) scale(0.95);
+        #pip .status.off { color: var(--danger); }
+        #pip .rec {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+            opacity: 0.5;
         }
-        #modeToggle.edit {
-            background: rgba(0,200,100,0.9);
-            box-shadow: 0 4px 20px rgba(0,200,100,0.4);
+        #pip .rec.on { 
+            opacity: 1;
+            animation: pulse 1s infinite;
         }
-        #modeToggle .icon {
-            font-size: 18px;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
         
-        /* Rotation Controls Panel */
-        #rotControls {
+        /* ===== Object Selector (Bottom Pills) ===== */
+        #objectSelector {
             position: fixed;
-            bottom: 80px;
+            bottom: 24px;
             left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            background: rgba(0,0,0,0.9);
-            border: 1px solid rgba(0,200,100,0.5);
-            border-radius: 16px;
-            padding: 12px 16px;
-            z-index: 150;
+            transform: translateX(-50%);
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            gap: 4px;
+            padding: 6px;
+            background: var(--panel);
+            border-radius: 28px;
+            border: 1px solid var(--border);
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            transition: all 0.3s ease;
+        }
+        #objectSelector.hidden {
             opacity: 0;
             pointer-events: none;
-            transition: all 0.3s;
+            transform: translateX(-50%) translateY(20px);
         }
-        #rotControls.show {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateX(-50%) translateY(0);
-        }
-        #rotControls .row {
+        .obj-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
             display: flex;
-            gap: 8px;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 2px;
         }
-        #rotControls .axis-label {
-            color: #888;
-            font-size: 11px;
-            width: 20px;
-            text-align: center;
-            font-weight: 600;
+        .obj-btn .icon { font-size: 18px; }
+        .obj-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .obj-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px var(--primary-dim);
         }
-        #rotControls button {
-            width: 44px;
-            height: 36px;
-            border: none;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.1);
-            color: #fff;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
+        .obj-btn.upload {
+            border: 2px dashed var(--border);
+            background: transparent;
         }
-        #rotControls button:active {
-            transform: scale(0.92);
-            background: rgba(255,255,255,0.2);
-        }
-        #rotControls button.rot-x { border-bottom: 2px solid #ff4444; }
-        #rotControls button.rot-y { border-bottom: 2px solid #44ff44; }
-        #rotControls button.rot-z { border-bottom: 2px solid #4488ff; }
-        #rotControls button.reset {
-            background: rgba(255,102,0,0.3);
-            border-bottom: 2px solid #ff6600;
-            width: auto;
-            padding: 0 16px;
+        .obj-btn.upload:hover {
+            border-color: var(--primary);
+            color: var(--primary);
         }
         
-        /* Edit mode hint */
-        #editHint {
+        /* ===== Mode Toggle ===== */
+        #modeToggle {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            border: 1px solid rgba(0,200,100,0.5);
-            border-radius: 12px;
-            padding: 16px 24px;
-            color: #fff;
-            font-size: 13px;
-            text-align: center;
-            z-index: 100;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
-        }
-        #editHint.show {
-            opacity: 1;
-        }
-        #editHint .gesture {
-            font-size: 28px;
-            margin-bottom: 8px;
-        }
-        
-        /* Gesture status badge */
-        #gestureStatus {
-            position: fixed;
-            bottom: 140px;
+            bottom: 90px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            border: 2px solid #444;
-            border-radius: 20px;
-            padding: 8px 16px;
-            color: #fff;
+            display: flex;
+            background: var(--panel);
+            border-radius: 25px;
+            padding: 4px;
+            border: 1px solid var(--border);
+            z-index: 200;
+            backdrop-filter: blur(20px);
+        }
+        .mode-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 21px;
+            background: transparent;
+            color: var(--text-dim);
             font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mode-btn .icon { font-size: 16px; }
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 16px var(--primary-dim);
+        }
+        .mode-btn.active.edit {
+            background: var(--success);
+            box-shadow: 0 4px 16px rgba(0,255,136,0.3);
+        }
+        
+        /* ===== Gesture Status ===== */
+        #gestureStatus {
+            position: fixed;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel);
+            border: 2px solid var(--border);
+            border-radius: 24px;
+            padding: 10px 20px;
             z-index: 160;
             display: none;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             min-width: 140px;
             justify-content: center;
-            transition: all 0.2s;
+            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
         }
         #gestureStatus.show { display: flex; }
-        #gestureStatus.fist { border-color: #ff6600; background: rgba(255,102,0,0.2); }
-        #gestureStatus.pinch { border-color: #00ff88; background: rgba(0,255,136,0.2); }
-        #gestureStatus.palm { border-color: #ff4488; background: rgba(255,68,136,0.2); }
-        #gestureStatus .icon { font-size: 18px; }
+        #gestureStatus.scale { border-color: var(--success); }
+        #gestureStatus.rotate { border-color: var(--primary); }
+        #gestureStatus.reset { border-color: var(--danger); }
+        #gestureStatus .icon { font-size: 20px; }
+        #gestureStatus .text { font-size: 13px; font-weight: 600; }
         #gestureStatus .progress {
             position: absolute;
             bottom: 0;
-            left: 10px;
-            right: 10px;
+            left: 16px;
+            right: 16px;
             height: 3px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
             border-radius: 2px;
             overflow: hidden;
         }
         #gestureStatus .progress::after {
             content: '';
             position: absolute;
-            left: 0;
-            top: 0;
+            left: 0; top: 0;
             height: 100%;
             width: var(--progress, 0%);
-            background: #ff4488;
+            background: var(--danger);
             transition: width 0.1s;
         }
         
-        /* Gesture help overlay */
+        /* ===== Model Info ===== */
+        #modelInfo {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            font-size: 12px;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(20px);
+        }
+        #modelInfo.show { display: flex; }
+        #modelInfo .icon { font-size: 16px; }
+        #modelInfo .name { 
+            color: var(--primary); 
+            font-weight: 600;
+            max-width: 150px; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap; 
+        }
+        #modelInfo .meta { color: var(--text-dim); font-size: 11px; }
+        #modelInfo .close { 
+            background: none; 
+            border: none; 
+            color: var(--text-dim); 
+            font-size: 16px; 
+            cursor: pointer;
+            padding: 4px;
+            margin-left: 4px;
+        }
+        #modelInfo .close:hover { color: var(--text); }
+        
+        /* ===== Debug Panel (Hidden by default) ===== */
+        #debugPanel {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 10px;
+            font-family: 'SF Mono', monospace;
+            z-index: 100;
+            min-width: 140px;
+            backdrop-filter: blur(20px);
+            transition: all 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+        }
+        #debugPanel.show {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        #debugPanel .row { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 3px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        #debugPanel .row:last-child { border-bottom: none; }
+        #debugPanel .label { color: var(--text-dim); }
+        #debugPanel .value { color: var(--primary); font-weight: 600; }
+        #debugPanel .value.ok { color: var(--success); }
+        #debugPanel .value.err { color: var(--danger); }
+        
+        /* Debug toggle button */
+        #debugToggle {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text-dim);
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 101;
+            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
+        }
+        #debugToggle:hover { 
+            color: var(--text);
+            border-color: var(--primary);
+        }
+        #debugToggle.active {
+            right: 180px;
+            color: var(--primary);
+        }
+        
+        /* ===== Gesture Help Overlay ===== */
         #gestureHelp {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 600;
+            backdrop-filter: blur(10px);
         }
         #gestureHelp.show { display: flex; }
-        #gestureHelp .help-content {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 16px;
-            padding: 24px;
+        #gestureHelp .content {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
             text-align: center;
-            max-width: 280px;
+            max-width: 320px;
         }
         #gestureHelp h3 {
-            color: #fff;
-            margin: 0 0 16px 0;
-            font-size: 18px;
+            font-size: 20px;
+            margin-bottom: 24px;
+            font-weight: 600;
         }
         #gestureHelp .gesture-row {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 0;
-            color: #ccc;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
             font-size: 14px;
-            border-bottom: 1px solid #333;
         }
         #gestureHelp .gesture-row:last-of-type { border-bottom: none; }
-        #gestureHelp .gesture-row span { font-size: 24px; width: 36px; }
+        #gestureHelp .gesture-row .icon { font-size: 28px; width: 50px; }
+        #gestureHelp .gesture-row .desc { text-align: left; color: var(--text-dim); }
         #gestureHelp button {
-            margin-top: 20px;
-            background: #ff6600;
+            margin-top: 24px;
+            background: var(--primary);
             border: none;
             border-radius: 20px;
-            padding: 10px 24px;
-            color: #fff;
+            padding: 12px 32px;
+            color: white;
             font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
         }
         
-        /* Help button */
+        /* Help button in edit mode */
         #helpBtn {
             position: fixed;
             bottom: 24px;
-            right: 140px;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.3);
-            background: rgba(0,0,0,0.6);
-            color: #fff;
+            left: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text-dim);
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
             z-index: 150;
             display: none;
+            backdrop-filter: blur(20px);
         }
-        #helpBtn.show { display: block; }
+        #helpBtn.show { display: flex; align-items: center; justify-content: center; }
+        #helpBtn:hover { color: var(--text); border-color: var(--success); }
         
-        /* Tutorial popup animation */
-        @keyframes tutorialPop {
-            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-        }
-        
-        /* Model info */
-        #modelInfo {
-            position: fixed;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            padding: 8px 16px;
-            border-radius: 16px;
-            color: #fff;
-            font-size: 11px;
-            z-index: 100;
-            display: none;
-            align-items: center;
-            gap: 8px;
-        }
-        #modelInfo.show { display: flex; }
-        #modelInfo .name { color: #ff6600; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #modelInfo .close { background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 0; margin-left: 8px; }
-        
-        /* Loading */
+        /* ===== Loading Overlay ===== */
         #loading {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(8,8,12,0.95);
             display: none;
             align-items: center;
             justify-content: center;
@@ -387,129 +422,131 @@
             z-index: 500;
         }
         #loading.show { display: flex; }
-        .spin {
-            width: 36px; height: 36px;
-            border: 3px solid rgba(255,102,0,0.2);
-            border-top-color: #ff6600;
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #loading p { color: #fff; margin-top: 12px; font-size: 13px; }
-        
-        /* Debug log */
-        #debugLog {
-            position: fixed;
-            bottom: 160px;
-            right: 10px;
-            width: 140px;
-            max-height: 150px;
-            background: rgba(0,0,0,0.85);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 8px;
-            font-size: 9px;
-            font-family: monospace;
-            color: #0f0;
-            overflow-y: auto;
-            z-index: 100;
+        #loading p { 
+            color: var(--text-dim); 
+            margin-top: 16px; 
+            font-size: 14px;
         }
-        #debugLog .e { color: #f55; }
-        #debugLog .w { color: #fa0; }
+        
+        /* Hidden file input */
+        #fileInput { display: none; }
+        
+        /* Tutorial animation */
+        @keyframes tutorialPop {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <canvas id="canvas3d"></canvas>
     
+    <!-- PIP Camera -->
     <div id="pip">
         <video id="vid" playsinline autoplay muted></video>
         <canvas id="ovr"></canvas>
-        <div id="dot"></div>
+        <div class="rec" id="rec"></div>
+        <div class="status" id="pipStatus">READY</div>
     </div>
     
-    <div id="status">
-        <div>Mode <span class="v" id="sMode">VIEW</span></div>
-        <div>Cam <span class="v" id="sCam">--</span></div>
-        <div>Track <span class="v" id="sTrack">--</span></div>
-        <div>Face <span class="v" id="sFace">--</span></div>
-        <div>X <span class="v" id="sX">0</span></div>
-        <div>Y <span class="v" id="sY">0</span></div>
-        <div>Model <span class="v" id="sModel">--</span></div>
+    <!-- Object Selector -->
+    <div id="objectSelector">
+        <button class="obj-btn active" data-obj="cube">
+            <span class="icon">▣</span>
+            <span>Cube</span>
+        </button>
+        <button class="obj-btn" data-obj="torus">
+            <span class="icon">◎</span>
+            <span>Knot</span>
+        </button>
+        <button class="obj-btn" data-obj="gem">
+            <span class="icon">◇</span>
+            <span>Gem</span>
+        </button>
+        <button class="obj-btn" data-obj="tesseract">
+            <span class="icon">⬢</span>
+            <span>Hyper</span>
+        </button>
+        <button class="obj-btn upload" id="uploadBtn">
+            <span class="icon">+</span>
+        </button>
+    </div>
+    <input type="file" id="fileInput" accept=".stl,.STL,.obj,.OBJ">
+    
+    <!-- Mode Toggle -->
+    <div id="modeToggle">
+        <button class="mode-btn active" data-mode="view">
+            <span class="icon">👁</span>
+            <span>View</span>
+        </button>
+        <button class="mode-btn" data-mode="edit">
+            <span class="icon">✋</span>
+            <span>Edit</span>
+        </button>
     </div>
     
-    <div id="debugLog"></div>
-    
-    <div id="objs">
-        <button class="ob on" data-o="sneaker">👟</button>
-        <button class="ob" data-o="cube">🎲</button>
-        <button class="ob" data-o="gem">💎</button>
-        <button id="uploadBtn">📁</button>
-        <input type="file" id="fileInput" accept=".stl,.STL,.obj,.OBJ" style="display:none">
-    </div>
-    
-    <div id="modelInfo">
-        <span>📦</span>
-        <span class="name" id="modelName"></span>
-        <button class="close" id="clearModel">✕</button>
-    </div>
-    
-    <!-- Mode Toggle Button -->
-    <button id="modeToggle">
-        <span class="icon">👁️</span>
-        <span class="label">VIEW MODE</span>
-    </button>
-    
-    <!-- Rotation Controls (shown in Edit mode) -->
-    <div id="rotControls">
-        <div class="row">
-            <span class="axis-label">X</span>
-            <button class="rot-x" data-axis="x" data-dir="-1">-90°</button>
-            <button class="rot-x" data-axis="x" data-dir="1">+90°</button>
-        </div>
-        <div class="row">
-            <span class="axis-label">Y</span>
-            <button class="rot-y" data-axis="y" data-dir="-1">-90°</button>
-            <button class="rot-y" data-axis="y" data-dir="1">+90°</button>
-        </div>
-        <div class="row">
-            <span class="axis-label">Z</span>
-            <button class="rot-z" data-axis="z" data-dir="-1">-90°</button>
-            <button class="rot-z" data-axis="z" data-dir="1">+90°</button>
-        </div>
-        <div class="row">
-            <button class="reset" id="resetRot">↺ Reset</button>
-        </div>
-    </div>
-    
-    <!-- Edit mode hint -->
-    <div id="editHint">
-        <div class="gesture">👆👆</div>
-        <div>Two-finger drag to rotate</div>
-    </div>
-    
-    <!-- Gesture status badge -->
+    <!-- Gesture Status -->
     <div id="gestureStatus">
         <span class="icon">👋</span>
-        <span class="text">Show hand</span>
+        <span class="text">Show hands</span>
         <div class="progress"></div>
     </div>
     
-    <!-- Gesture help overlay -->
+    <!-- Model Info -->
+    <div id="modelInfo">
+        <span class="icon">📦</span>
+        <span class="name" id="modelName"></span>
+        <span class="meta" id="modelMeta"></span>
+        <button class="close" id="clearModel">✕</button>
+    </div>
+    
+    <!-- Debug Toggle -->
+    <button id="debugToggle">⚙</button>
+    
+    <!-- Debug Panel -->
+    <div id="debugPanel">
+        <div class="row"><span class="label">Mode</span><span class="value" id="dMode">VIEW</span></div>
+        <div class="row"><span class="label">Camera</span><span class="value" id="dCam">--</span></div>
+        <div class="row"><span class="label">Track</span><span class="value" id="dTrack">--</span></div>
+        <div class="row"><span class="label">Hands</span><span class="value" id="dHands">0</span></div>
+        <div class="row"><span class="label">FPS</span><span class="value" id="dFPS">--</span></div>
+    </div>
+    
+    <!-- Gesture Help -->
     <div id="gestureHelp">
-        <div class="help-content">
-            <h3>✋ Hand Gestures</h3>
-            <div class="gesture-row"><span>✊</span> One fist → Drag to rotate</div>
-            <div class="gesture-row"><span>👌👌</span> Two pinch → Move apart/together to scale</div>
-            <div class="gesture-row"><span>✋✋</span> Two open hands → Hold 2s to reset</div>
-            <button id="closeHelp">Got it!</button>
+        <div class="content">
+            <h3>Hand Gestures</h3>
+            <div class="gesture-row">
+                <span class="icon">✊</span>
+                <span class="desc">Fist + drag to rotate model</span>
+            </div>
+            <div class="gesture-row">
+                <span class="icon">👌👌</span>
+                <span class="desc">Two pinch, spread to scale</span>
+            </div>
+            <div class="gesture-row">
+                <span class="icon">✋✋</span>
+                <span class="desc">Both open, hold 2s to reset</span>
+            </div>
+            <button id="closeHelp">Got it</button>
         </div>
     </div>
     
-    <!-- Help button (shown in edit mode) -->
+    <!-- Help Button -->
     <button id="helpBtn">?</button>
     
+    <!-- Loading -->
     <div id="loading">
-        <div class="spin"></div>
+        <div class="spinner"></div>
         <p id="loadTxt">Loading...</p>
     </div>
 
@@ -521,32 +558,37 @@
     (function() {
         'use strict';
         
-        // ============ DEBUG SYSTEM ============
         const $ = id => document.getElementById(id);
-        const logEl = $('debugLog');
         
+        // ============ LOGGING ============
         function log(msg, type = '') {
-            const d = document.createElement('div');
-            d.className = type;
-            d.textContent = msg;
-            logEl.appendChild(d);
-            logEl.scrollTop = logEl.scrollHeight;
             console.log(`[${type||'i'}] ${msg}`);
         }
         
-        function stat(id, val, cls) {
+        function setDebug(id, val, status = '') {
             const el = $(id);
             if (el) {
                 el.textContent = val;
-                el.className = 'v ' + (cls || '');
+                el.className = 'value ' + status;
             }
         }
         
-        // ============ STL LOADER ============
+        // ============ FPS COUNTER ============
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
+        function updateFPS() {
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsTime >= 1000) {
+                setDebug('dFPS', frameCount);
+                frameCount = 0;
+                lastFpsTime = now;
+            }
+        }
+        
+        // ============ STL PARSER ============
         function parseSTL(buffer) {
-            log('Parsing STL...');
-            
-            function isBinary(data) {
+            const isBinary = data => {
                 const reader = new DataView(data);
                 const faceSize = (32/8*3) + ((32/8*3)*3) + (16/8);
                 const nFaces = reader.getUint32(80, true);
@@ -557,18 +599,14 @@
                     if (solid[i] !== reader.getUint8(i)) return true;
                 }
                 return false;
-            }
+            };
             
-            function parseBinary(data) {
+            const parseBinary = data => {
                 const reader = new DataView(data);
                 const faces = reader.getUint32(80, true);
-                log(`Binary STL: ${faces} faces`);
-                
-                const vertices = new Float32Array(faces * 3 * 3);
-                const normals = new Float32Array(faces * 3 * 3);
-                
-                const dataOffset = 84;
-                const faceLength = 12 * 4 + 2;
+                const vertices = new Float32Array(faces * 9);
+                const normals = new Float32Array(faces * 9);
+                const dataOffset = 84, faceLength = 50;
                 
                 for (let face = 0; face < faces; face++) {
                     const start = dataOffset + face * faceLength;
@@ -577,16 +615,11 @@
                     const nz = reader.getFloat32(start + 8, true);
                     
                     for (let i = 1; i <= 3; i++) {
-                        const vStart = start + i * 12;
                         const idx = (face * 9) + ((i-1) * 3);
-                        
-                        vertices[idx] = reader.getFloat32(vStart, true);
-                        vertices[idx + 1] = reader.getFloat32(vStart + 4, true);
-                        vertices[idx + 2] = reader.getFloat32(vStart + 8, true);
-                        
-                        normals[idx] = nx;
-                        normals[idx + 1] = ny;
-                        normals[idx + 2] = nz;
+                        vertices[idx] = reader.getFloat32(start + i*12, true);
+                        vertices[idx+1] = reader.getFloat32(start + i*12 + 4, true);
+                        vertices[idx+2] = reader.getFloat32(start + i*12 + 8, true);
+                        normals[idx] = nx; normals[idx+1] = ny; normals[idx+2] = nz;
                     }
                 }
                 
@@ -594,16 +627,12 @@
                 geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
                 geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
                 return geo;
-            }
+            };
             
-            function parseASCII(text) {
-                log('ASCII STL format');
-                const lines = text.split('\n');
-                const vertices = [];
-                const normals = [];
+            const parseASCII = text => {
+                const vertices = [], normals = [];
                 let currentNormal = [0, 0, 1];
-                
-                for (const line of lines) {
+                text.split('\n').forEach(line => {
                     const parts = line.trim().split(/\s+/);
                     if (parts[0] === 'facet' && parts[1] === 'normal') {
                         currentNormal = [parseFloat(parts[2]), parseFloat(parts[3]), parseFloat(parts[4])];
@@ -611,183 +640,210 @@
                         vertices.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
                         normals.push(...currentNormal);
                     }
-                }
-                
-                log(`ASCII STL: ${vertices.length/9} faces`);
-                
+                });
                 const geo = new THREE.BufferGeometry();
                 geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                 geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
                 return geo;
-            }
+            };
             
-            if (isBinary(buffer)) {
-                return parseBinary(buffer);
-            } else {
-                const text = new TextDecoder().decode(buffer);
-                return parseASCII(text);
-            }
+            return isBinary(buffer) ? parseBinary(buffer) : parseASCII(new TextDecoder().decode(buffer));
         }
         
-        // ============ OBJ LOADER ============
+        // ============ OBJ PARSER ============
         function parseOBJ(text) {
-            log('Parsing OBJ...');
+            const vertices = [], normals = [], outPos = [], outNorm = [];
             
-            const lines = text.split('\n');
-            const vertices = [];   // v x y z
-            const normals = [];    // vn x y z
-            const uvs = [];        // vt u v
-            
-            const outPositions = [];
-            const outNormals = [];
-            
-            let faceCount = 0;
-            
-            // First pass: collect all vertices, normals, uvs
-            for (const line of lines) {
+            text.split('\n').forEach(line => {
                 const parts = line.trim().split(/\s+/);
-                const cmd = parts[0];
-                
-                if (cmd === 'v') {
-                    vertices.push([
-                        parseFloat(parts[1]) || 0,
-                        parseFloat(parts[2]) || 0,
-                        parseFloat(parts[3]) || 0
-                    ]);
-                } else if (cmd === 'vn') {
-                    normals.push([
-                        parseFloat(parts[1]) || 0,
-                        parseFloat(parts[2]) || 0,
-                        parseFloat(parts[3]) || 0
-                    ]);
-                } else if (cmd === 'vt') {
-                    uvs.push([
-                        parseFloat(parts[1]) || 0,
-                        parseFloat(parts[2]) || 0
-                    ]);
-                }
-            }
+                if (parts[0] === 'v') vertices.push([+parts[1], +parts[2], +parts[3]]);
+                else if (parts[0] === 'vn') normals.push([+parts[1], +parts[2], +parts[3]]);
+            });
             
-            log(`OBJ: ${vertices.length} verts, ${normals.length} normals`);
-            
-            // Helper: parse face index (handles 1-based, negative, v/vt/vn formats)
-            function parseFaceVertex(str) {
-                const parts = str.split('/');
-                let vi = parseInt(parts[0]) || 0;
-                let ti = parseInt(parts[1]) || 0;  // texture index (unused)
-                let ni = parseInt(parts[2]) || 0;  // normal index
-                
-                // Handle negative indices (relative to end)
-                if (vi < 0) vi = vertices.length + vi + 1;
-                if (ni < 0) ni = normals.length + ni + 1;
-                
-                // Convert to 0-based
-                return { v: vi - 1, n: ni - 1 };
-            }
-            
-            // Helper: add a triangle to output
-            function addTriangle(a, b, c) {
-                const va = vertices[a.v] || [0,0,0];
-                const vb = vertices[b.v] || [0,0,0];
-                const vc = vertices[c.v] || [0,0,0];
-                
-                outPositions.push(...va, ...vb, ...vc);
-                
-                // Use provided normals or compute face normal
-                if (a.n >= 0 && normals[a.n] && b.n >= 0 && normals[b.n] && c.n >= 0 && normals[c.n]) {
-                    outNormals.push(...normals[a.n], ...normals[b.n], ...normals[c.n]);
-                } else {
-                    // Compute face normal
-                    const u = [vb[0]-va[0], vb[1]-va[1], vb[2]-va[2]];
-                    const v = [vc[0]-va[0], vc[1]-va[1], vc[2]-va[2]];
-                    const n = [
-                        u[1]*v[2] - u[2]*v[1],
-                        u[2]*v[0] - u[0]*v[2],
-                        u[0]*v[1] - u[1]*v[0]
-                    ];
-                    const len = Math.sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]) || 1;
-                    n[0] /= len; n[1] /= len; n[2] /= len;
-                    outNormals.push(...n, ...n, ...n);
-                }
-                
-                faceCount++;
-            }
-            
-            // Second pass: process faces
-            for (const line of lines) {
+            text.split('\n').forEach(line => {
                 const parts = line.trim().split(/\s+/);
-                if (parts[0] !== 'f') continue;
-                
-                // Parse all face vertices
-                const faceVerts = [];
+                if (parts[0] !== 'f') return;
+                const fv = [];
                 for (let i = 1; i < parts.length; i++) {
-                    if (parts[i].length > 0) {
-                        faceVerts.push(parseFaceVertex(parts[i]));
-                    }
+                    const p = parts[i].split('/');
+                    let vi = parseInt(p[0]) || 0;
+                    let ni = parseInt(p[2]) || 0;
+                    if (vi < 0) vi = vertices.length + vi + 1;
+                    if (ni < 0) ni = normals.length + ni + 1;
+                    fv.push({ v: vi - 1, n: ni - 1 });
                 }
-                
-                if (faceVerts.length < 3) continue;
-                
-                // Triangulate using fan method
-                // Works well for convex polygons (tris, quads, most n-gons)
-                for (let i = 1; i < faceVerts.length - 1; i++) {
-                    addTriangle(faceVerts[0], faceVerts[i], faceVerts[i + 1]);
+                for (let i = 1; i < fv.length - 1; i++) {
+                    [fv[0], fv[i], fv[i+1]].forEach(f => {
+                        const v = vertices[f.v] || [0,0,0];
+                        outPos.push(...v);
+                        if (f.n >= 0 && normals[f.n]) outNorm.push(...normals[f.n]);
+                        else outNorm.push(0, 1, 0);
+                    });
                 }
-            }
-            
-            log(`OBJ: ${faceCount} triangles`);
+            });
             
             const geo = new THREE.BufferGeometry();
-            geo.setAttribute('position', new THREE.Float32BufferAttribute(outPositions, 3));
-            geo.setAttribute('normal', new THREE.Float32BufferAttribute(outNormals, 3));
-            
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(outPos, 3));
+            geo.setAttribute('normal', new THREE.Float32BufferAttribute(outNorm, 3));
             return geo;
         }
         
-        // ============ HAND CONTROLLER (Two-Hand Scale) ============
+        // ============ TESSERACT (4D Hypercube) ============
+        class Tesseract {
+            constructor() {
+                this.group = new THREE.Group();
+                this.vertices4D = [];
+                this.rotationXW = 0;
+                this.rotationYW = 0;
+                this.rotationZW = 0;
+                
+                // Scale factor for the final 3D projection
+                this.scale3D = 60;
+                
+                // Generate 16 vertices of a 4D hypercube (±1 in each dimension)
+                for (let i = 0; i < 16; i++) {
+                    this.vertices4D.push([
+                        (i & 1) ? 1 : -1,
+                        (i & 2) ? 1 : -1,
+                        (i & 4) ? 1 : -1,
+                        (i & 8) ? 1 : -1
+                    ]);
+                }
+                
+                // Edges: connect vertices that differ in exactly one coordinate (32 edges total)
+                this.edges = [];
+                for (let i = 0; i < 16; i++) {
+                    for (let j = i + 1; j < 16; j++) {
+                        let diff = 0;
+                        for (let k = 0; k < 4; k++) {
+                            if (this.vertices4D[i][k] !== this.vertices4D[j][k]) diff++;
+                        }
+                        if (diff === 1) this.edges.push([i, j]);
+                    }
+                }
+                
+                // Create lines for each edge
+                this.lines = [];
+                this.edges.forEach(() => {
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0, 0,0,0], 3));
+                    const mat = new THREE.LineBasicMaterial({ 
+                        color: 0xff6a00,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const line = new THREE.Line(geo, mat);
+                    this.lines.push(line);
+                    this.group.add(line);
+                });
+                
+                // Small vertex dots (fixed size, not scaled with group)
+                this.dots = [];
+                for (let i = 0; i < 16; i++) {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(2.5, 8, 8),
+                        new THREE.MeshBasicMaterial({ color: 0x00f0ff })
+                    );
+                    this.dots.push(dot);
+                    this.group.add(dot);
+                }
+                
+                this.group.position.z = -80;
+                // NO group.scale - we handle scaling in projection
+            }
+            
+            project4Dto3D(v4, rotXW, rotYW, rotZW) {
+                let [x, y, z, w] = v4;
+                
+                // Rotate in XW plane
+                const cosXW = Math.cos(rotXW), sinXW = Math.sin(rotXW);
+                [x, w] = [x * cosXW - w * sinXW, x * sinXW + w * cosXW];
+                
+                // Rotate in YW plane  
+                const cosYW = Math.cos(rotYW), sinYW = Math.sin(rotYW);
+                [y, w] = [y * cosYW - w * sinYW, y * sinYW + w * cosYW];
+                
+                // Rotate in ZW plane
+                const cosZW = Math.cos(rotZW), sinZW = Math.sin(rotZW);
+                [z, w] = [z * cosZW - w * sinZW, z * sinZW + w * cosZW];
+                
+                // Perspective projection from 4D to 3D
+                // Use a safe distance to prevent extreme values
+                const distance = 2.5;
+                const wClamped = Math.max(-1.5, Math.min(1.5, w)); // Clamp to prevent infinity
+                const perspScale = distance / (distance - wClamped);
+                
+                return { 
+                    x: x * perspScale * this.scale3D, 
+                    y: y * perspScale * this.scale3D, 
+                    z: z * perspScale * this.scale3D, 
+                    w: wClamped 
+                };
+            }
+            
+            update(dt) {
+                // Animate 4D rotation at different speeds for interesting motion
+                this.rotationXW += dt * 0.4;
+                this.rotationYW += dt * 0.25;
+                this.rotationZW += dt * 0.15;
+                
+                // Project all vertices to 3D
+                const projected = this.vertices4D.map(v => 
+                    this.project4Dto3D(v, this.rotationXW, this.rotationYW, this.rotationZW)
+                );
+                
+                // Update vertex dot positions and sizes
+                projected.forEach((p, i) => {
+                    this.dots[i].position.set(p.x, p.y, p.z);
+                    // Size based on W coordinate (closer in 4D = larger)
+                    const s = 0.6 + (p.w + 1.5) * 0.3;
+                    this.dots[i].scale.setScalar(Math.max(0.3, Math.min(1.5, s)));
+                });
+                
+                // Update edge lines
+                this.edges.forEach(([a, b], i) => {
+                    const pa = projected[a], pb = projected[b];
+                    const positions = this.lines[i].geometry.attributes.position.array;
+                    positions[0] = pa.x; positions[1] = pa.y; positions[2] = pa.z;
+                    positions[3] = pb.x; positions[4] = pb.y; positions[5] = pb.z;
+                    this.lines[i].geometry.attributes.position.needsUpdate = true;
+                    
+                    // Opacity based on average W depth (closer = more opaque)
+                    const avgW = (pa.w + pb.w) / 2;
+                    this.lines[i].material.opacity = 0.3 + (avgW + 1.5) * 0.25;
+                });
+            }
+        }
+        
+        // ============ HAND CONTROLLER ============
         class HandController {
             constructor(app) {
                 this.app = app;
                 this.hands = null;
                 this.ready = false;
                 this.active = false;
-                
-                // State machine: IDLE, TRACKING, FIST_ROTATE, TWO_HAND_SCALE, TWO_HAND_EXIT
                 this.state = 'IDLE';
                 this.stateStartTime = 0;
                 
-                // Hand data (supports 2 hands)
-                this.handData = [null, null]; // [{landmarks, isPinching, isOpen, pinchPoint}, ...]
+                this.handData = [null, null];
                 this.handsDetected = 0;
                 
-                // Gesture stability (prevents flicker)
                 this.stableState = 'IDLE';
                 this.stableStateStart = 0;
-                this.requiredStableTime = 120; // ms to confirm gesture
+                this.requiredStableTime = 120;
                 
-                // Single hand tracking (for fist rotate)
                 this.handCenter = { x: 0.5, y: 0.5 };
                 this.prevHandCenter = { x: 0.5, y: 0.5 };
                 
-                // Two-hand scale tracking
                 this.scaleStartDistance = 0;
                 this.scaleStartValue = 1;
-                
-                // Two-hand exit/reset tracking
                 this.twoHandOpenStart = 0;
+                this.hasShownHint = false;
                 
-                // First-time hints
-                this.hasShownScaleHint = false;
-                
-                // UI elements
                 this.statusEl = $('gestureStatus');
                 this.statusIcon = this.statusEl.querySelector('.icon');
                 this.statusText = this.statusEl.querySelector('.text');
                 this.progressEl = this.statusEl.querySelector('.progress');
-                
-                // Idle hint timer
-                this.idleTimer = null;
-                this.hintShown = false;
             }
             
             async init() {
@@ -797,22 +853,18 @@
                 }
                 
                 try {
-                    log('Initializing 2-hand tracking...');
                     this.hands = new Hands({
                         locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
                     });
-                    
                     this.hands.setOptions({
-                        maxNumHands: 2,              // Track 2 hands!
-                        modelComplexity: 0,          // 0 = lite, fastest
+                        maxNumHands: 2,
+                        modelComplexity: 0,
                         minDetectionConfidence: 0.6,
                         minTrackingConfidence: 0.5
                     });
-                    
                     this.hands.onResults(r => this.onResults(r));
-                    
                     this.ready = true;
-                    log('2-hand tracking ready', 'ok');
+                    log('Hand tracking ready', 'ok');
                     return true;
                 } catch (err) {
                     log(`Hand init failed: ${err.message}`, 'e');
@@ -827,8 +879,16 @@
                 this.showStatus('👋', 'Show hands');
                 this.statusEl.classList.add('show');
                 $('helpBtn').classList.add('show');
-                this.startIdleTimer();
-                log('Hand control started (2-hand mode)');
+                
+                if (!this.hasShownHint) {
+                    this.hasShownHint = true;
+                    setTimeout(() => {
+                        if (this.active && this.state === 'IDLE') {
+                            $('gestureHelp').classList.add('show');
+                        }
+                    }, 3000);
+                }
+                
                 this.runDetection();
             }
             
@@ -836,50 +896,22 @@
                 this.active = false;
                 this.state = 'IDLE';
                 this.handData = [null, null];
-                this.handsDetected = 0;
-                this.statusEl.classList.remove('show', 'fist', 'pinch', 'palm');
+                this.statusEl.classList.remove('show', 'scale', 'rotate', 'reset');
                 $('helpBtn').classList.remove('show');
-                this.clearIdleTimer();
-                log('Hand control stopped');
-            }
-            
-            startIdleTimer() {
-                this.clearIdleTimer();
-                this.idleTimer = setTimeout(() => {
-                    if (this.active && this.state === 'IDLE' && !this.hintShown) {
-                        this.hintShown = true;
-                        $('gestureHelp').classList.add('show');
-                    }
-                }, 4000);
-            }
-            
-            clearIdleTimer() {
-                if (this.idleTimer) {
-                    clearTimeout(this.idleTimer);
-                    this.idleTimer = null;
-                }
             }
             
             runDetection() {
                 if (!this.active || !this.hands || !this.app.vid) return;
-                
                 const detect = async () => {
                     if (!this.active) return;
-                    
                     if (this.app.vid.readyState >= 2) {
-                        try {
-                            await this.hands.send({ image: this.app.vid });
-                        } catch (e) { /* ignore */ }
+                        try { await this.hands.send({ image: this.app.vid }); } catch(e) {}
                     }
-                    
-                    if (this.active) {
-                        requestAnimationFrame(detect);
-                    }
+                    if (this.active) requestAnimationFrame(detect);
                 };
                 detect();
             }
             
-            // ==================== MAIN RESULTS HANDLER ====================
             onResults(results) {
                 if (!this.active) return;
                 
@@ -887,8 +919,8 @@
                 const ovr = this.app.ovr;
                 if (ctx) ctx.clearRect(0, 0, ovr.width, ovr.height);
                 
-                // Process hands
                 this.handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+                setDebug('dHands', this.handsDetected);
                 this.handData = [null, null];
                 
                 if (this.handsDetected === 0) {
@@ -896,792 +928,549 @@
                     return;
                 }
                 
-                // Analyze each hand
                 for (let i = 0; i < this.handsDetected; i++) {
-                    const landmarks = results.multiHandLandmarks[i];
-                    this.handData[i] = this.analyzeHand(landmarks);
+                    this.handData[i] = this.analyzeHand(results.multiHandLandmarks[i]);
                 }
                 
-                // Sort hands by X position (left to right for consistent tracking)
                 if (this.handsDetected === 2 && this.handData[0] && this.handData[1]) {
                     if (this.handData[0].centerX > this.handData[1].centerX) {
-                        const temp = this.handData[0];
-                        this.handData[0] = this.handData[1];
-                        this.handData[1] = temp;
+                        [this.handData[0], this.handData[1]] = [this.handData[1], this.handData[0]];
                     }
                 }
                 
-                // Draw hands
                 this.drawHands(ctx, ovr);
-                
-                // Detect gesture
-                const detectedGesture = this.detectGesture();
-                
-                // Apply stability filter
-                this.applyStabilityFilter(detectedGesture);
-                
-                // Execute action for current state
-                this.executeStateAction();
+                const gesture = this.detectGesture();
+                this.applyStability(gesture);
+                this.executeAction();
             }
             
-            // ==================== HAND ANALYSIS ====================
             analyzeHand(landmarks) {
                 if (!landmarks || landmarks.length < 21) return null;
-                
                 const lm = landmarks;
                 
-                // Landmark indices
-                const WRIST = 0;
-                const THUMB_TIP = 4, THUMB_IP = 3;
-                const INDEX_TIP = 8, INDEX_PIP = 6, INDEX_MCP = 5;
-                const MIDDLE_TIP = 12, MIDDLE_PIP = 10, MIDDLE_MCP = 9;
-                const RING_TIP = 16, RING_PIP = 14, RING_MCP = 13;
-                const PINKY_TIP = 20, PINKY_PIP = 18, PINKY_MCP = 17;
+                const dist = (a, b) => Math.sqrt(Math.pow(lm[a].x - lm[b].x, 2) + Math.pow(lm[a].y - lm[b].y, 2));
                 
-                // Distance helper
-                const dist = (a, b) => Math.sqrt(
-                    Math.pow(lm[a].x - lm[b].x, 2) + Math.pow(lm[a].y - lm[b].y, 2)
-                );
-                
-                // Calculate hand center
-                const palmIndices = [WRIST, INDEX_MCP, MIDDLE_MCP, RING_MCP, PINKY_MCP];
                 let cx = 0, cy = 0;
-                palmIndices.forEach(i => { cx += lm[i].x; cy += lm[i].y; });
-                cx /= palmIndices.length;
-                cy /= palmIndices.length;
+                [0, 5, 9, 13, 17].forEach(i => { cx += lm[i].x; cy += lm[i].y; });
+                cx /= 5; cy /= 5;
                 
-                // Check if finger is extended (tip far from wrist, beyond pip)
                 const isExtended = (tip, pip, mcp) => {
-                    const tipToWrist = dist(tip, WRIST);
-                    const mcpToWrist = dist(mcp, WRIST);
-                    const tipToPip = dist(tip, pip);
-                    return tipToWrist > mcpToWrist * 0.9 && tipToPip > 0.06;
+                    const tipToWrist = dist(tip, 0);
+                    const mcpToWrist = dist(mcp, 0);
+                    return tipToWrist > mcpToWrist * 0.9;
                 };
                 
-                // Finger states
-                const indexExtended = isExtended(INDEX_TIP, INDEX_PIP, INDEX_MCP);
-                const middleExtended = isExtended(MIDDLE_TIP, MIDDLE_PIP, MIDDLE_MCP);
-                const ringExtended = isExtended(RING_TIP, RING_PIP, RING_MCP);
-                const pinkyExtended = isExtended(PINKY_TIP, PINKY_PIP, PINKY_MCP);
+                const extCount = [
+                    isExtended(8, 6, 5),
+                    isExtended(12, 10, 9),
+                    isExtended(16, 14, 13),
+                    isExtended(20, 18, 17)
+                ].filter(Boolean).length;
                 
-                const extendedCount = [indexExtended, middleExtended, ringExtended, pinkyExtended].filter(Boolean).length;
-                const curledCount = 4 - extendedCount;
-                
-                // Pinch detection: thumb tip close to index tip
-                const pinchDist = dist(THUMB_TIP, INDEX_TIP);
+                const pinchDist = dist(4, 8);
                 const isPinching = pinchDist < 0.09;
+                const pinchPoint = { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 };
+                const thumbAway = dist(4, 5) > 0.1;
+                const isOpen = extCount >= 3 && thumbAway && pinchDist > 0.12;
+                const isFist = (4 - extCount) >= 3 && !isPinching;
                 
-                // Pinch point: midpoint between thumb and index tips
-                const pinchPoint = {
-                    x: (lm[THUMB_TIP].x + lm[INDEX_TIP].x) / 2,
-                    y: (lm[THUMB_TIP].y + lm[INDEX_TIP].y) / 2
-                };
-                
-                // Open hand: most fingers extended, thumb away
-                const thumbAway = dist(THUMB_TIP, INDEX_MCP) > 0.1;
-                const isOpen = extendedCount >= 3 && thumbAway && pinchDist > 0.12;
-                
-                // Fist: most fingers curled
-                const isFist = curledCount >= 3 && !isPinching;
-                
-                return {
-                    landmarks: lm,
-                    centerX: cx,
-                    centerY: cy,
-                    isPinching,
-                    pinchPoint,
-                    pinchDist,
-                    isOpen,
-                    isFist,
-                    extendedCount,
-                    curledCount
-                };
+                return { landmarks: lm, centerX: cx, centerY: cy, isPinching, pinchPoint, isOpen, isFist };
             }
             
-            // ==================== GESTURE DETECTION ====================
             detectGesture() {
-                const h0 = this.handData[0];
-                const h1 = this.handData[1];
+                const [h0, h1] = this.handData;
                 
-                // ----- TWO HANDS DETECTED -----
                 if (this.handsDetected === 2 && h0 && h1) {
-                    
-                    // Both hands open → EXIT/RESET mode
-                    if (h0.isOpen && h1.isOpen) {
-                        return 'TWO_HAND_EXIT';
-                    }
-                    
-                    // Both hands pinching → SCALE mode
-                    if (h0.isPinching && h1.isPinching) {
-                        return 'TWO_HAND_SCALE';
-                    }
-                    
-                    // Two hands but mixed gestures → just tracking
+                    if (h0.isOpen && h1.isOpen) return 'TWO_HAND_EXIT';
+                    if (h0.isPinching && h1.isPinching) return 'TWO_HAND_SCALE';
                     return 'TWO_HAND_TRACKING';
                 }
                 
-                // ----- ONE HAND DETECTED -----
                 if (this.handsDetected === 1 && h0) {
-                    
-                    // Update single-hand tracking for rotate
                     this.prevHandCenter = { ...this.handCenter };
                     this.handCenter = { x: h0.centerX, y: h0.centerY };
-                    
-                    // Fist → ROTATE
-                    if (h0.isFist) {
-                        return 'FIST_ROTATE';
-                    }
-                    
-                    // Open hand → IDLE (waiting)
-                    if (h0.isOpen) {
-                        return 'TRACKING';
-                    }
-                    
-                    // Something else → just tracking
+                    if (h0.isFist) return 'FIST_ROTATE';
                     return 'TRACKING';
                 }
                 
                 return 'IDLE';
             }
             
-            // ==================== STABILITY FILTER ====================
-            applyStabilityFilter(detectedGesture) {
+            applyStability(gesture) {
                 const now = Date.now();
-                
-                // If gesture changed, start stability timer
-                if (detectedGesture !== this.stableState) {
-                    this.stableState = detectedGesture;
+                if (gesture !== this.stableState) {
+                    this.stableState = gesture;
                     this.stableStateStart = now;
-                    return; // Don't change state yet
+                    return;
                 }
-                
-                // If gesture stable long enough, commit it
-                if (now - this.stableStateStart >= this.requiredStableTime) {
-                    if (detectedGesture !== this.state) {
-                        this.enterState(detectedGesture);
-                    }
+                if (now - this.stableStateStart >= this.requiredStableTime && gesture !== this.state) {
+                    this.enterState(gesture);
                 }
             }
             
-            // ==================== STATE MANAGEMENT ====================
             enterState(newState) {
-                const oldState = this.state;
                 this.state = newState;
                 this.stateStartTime = Date.now();
-                
-                log(`State: ${oldState} → ${newState}`);
-                
-                // Clear UI classes
-                this.statusEl.classList.remove('fist', 'pinch', 'palm');
+                this.statusEl.classList.remove('scale', 'rotate', 'reset');
                 this.progressEl.style.setProperty('--progress', '0%');
                 
                 switch (newState) {
                     case 'IDLE':
                         this.showStatus('👋', 'Show hands');
-                        this.startIdleTimer();
                         break;
-                        
                     case 'TRACKING':
-                        this.showStatus('✋', 'Tracking...');
-                        this.clearIdleTimer();
+                        this.showStatus('✋', 'Tracking');
                         break;
-                        
                     case 'FIST_ROTATE':
-                        this.showStatus('✊', 'Drag to rotate');
-                        this.statusEl.classList.add('fist');
-                        this.clearIdleTimer();
+                        this.showStatus('✊', 'Rotate');
+                        this.statusEl.classList.add('rotate');
                         break;
-                        
-                    case 'TWO_HAND_TRACKING':
-                        this.showStatus('🙌', 'Both hands seen');
-                        this.clearIdleTimer();
-                        break;
-                        
                     case 'TWO_HAND_SCALE':
                         this.enterScaleMode();
                         break;
-                        
                     case 'TWO_HAND_EXIT':
                         this.twoHandOpenStart = Date.now();
-                        this.showStatus('✋✋', 'Hold 2s to reset');
-                        this.statusEl.classList.add('palm');
-                        this.clearIdleTimer();
+                        this.showStatus('✋✋', 'Hold to reset');
+                        this.statusEl.classList.add('reset');
                         break;
                 }
             }
             
             enterScaleMode() {
-                // Calculate starting distance between pinch points
-                const h0 = this.handData[0];
-                const h1 = this.handData[1];
-                
-                if (h0 && h1 && h0.pinchPoint && h1.pinchPoint) {
+                const [h0, h1] = this.handData;
+                if (h0 && h1) {
                     const dx = h1.pinchPoint.x - h0.pinchPoint.x;
                     const dy = h1.pinchPoint.y - h0.pinchPoint.y;
-                    this.scaleStartDistance = Math.sqrt(dx * dx + dy * dy);
+                    this.scaleStartDistance = Math.sqrt(dx*dx + dy*dy) || 0.3;
                     this.scaleStartValue = this.app.obj ? this.app.obj.scale.x : 1;
-                } else {
-                    this.scaleStartDistance = 0.3;
-                    this.scaleStartValue = 1;
                 }
-                
-                this.showStatus('👌👌', 'Scale ↔');
-                this.statusEl.classList.add('pinch');
-                this.clearIdleTimer();
-                
-                // Show tutorial on first use
-                if (!this.hasShownScaleHint) {
-                    this.hasShownScaleHint = true;
-                    this.showScaleTutorial();
-                }
+                this.showStatus('👌👌', 'Scale');
+                this.statusEl.classList.add('scale');
             }
             
             handleNoHands() {
-                // Go to IDLE after brief delay
-                if (this.state !== 'IDLE') {
-                    this.stableState = 'IDLE';
-                    if (Date.now() - this.stableStateStart > 300) {
-                        this.enterState('IDLE');
-                    }
+                if (this.state !== 'IDLE' && Date.now() - this.stableStateStart > 300) {
+                    this.enterState('IDLE');
                 }
             }
             
-            // ==================== STATE ACTIONS ====================
-            executeStateAction() {
+            executeAction() {
                 switch (this.state) {
-                    case 'FIST_ROTATE':
-                        this.applyRotation();
-                        break;
-                    case 'TWO_HAND_SCALE':
-                        this.applyTwoHandScale();
-                        break;
-                    case 'TWO_HAND_EXIT':
-                        this.checkTwoHandReset();
-                        break;
+                    case 'FIST_ROTATE': this.applyRotation(); break;
+                    case 'TWO_HAND_SCALE': this.applyScale(); break;
+                    case 'TWO_HAND_EXIT': this.checkReset(); break;
                 }
             }
             
             applyRotation() {
                 const dx = this.handCenter.x - this.prevHandCenter.x;
                 const dy = this.handCenter.y - this.prevHandCenter.y;
-                
-                // Ignore tiny movements
                 if (Math.abs(dx) < 0.003 && Math.abs(dy) < 0.003) return;
-                
-                const sensitivity = 3;
-                this.app.modelRotation.y += dx * sensitivity;
-                this.app.modelRotation.x += dy * sensitivity;
+                this.app.modelRotation.y += dx * 3;
+                this.app.modelRotation.x += dy * 3;
             }
             
-            applyTwoHandScale() {
-                const h0 = this.handData[0];
-                const h1 = this.handData[1];
+            applyScale() {
+                const [h0, h1] = this.handData;
+                if (!h0 || !h1 || !this.app.obj || this.scaleStartDistance < 0.01) return;
                 
-                if (!h0 || !h1 || !h0.pinchPoint || !h1.pinchPoint) return;
-                if (!this.app.obj) return;
-                if (this.scaleStartDistance < 0.01) return; // Prevent division issues
-                
-                // Current distance between pinch points
                 const dx = h1.pinchPoint.x - h0.pinchPoint.x;
                 const dy = h1.pinchPoint.y - h0.pinchPoint.y;
-                const currentDistance = Math.sqrt(dx * dx + dy * dy);
-                
-                // Scale ratio
-                const ratio = currentDistance / this.scaleStartDistance;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const ratio = dist / this.scaleStartDistance;
                 const newScale = Math.max(0.2, Math.min(4, this.scaleStartValue * ratio));
                 
                 this.app.obj.scale.setScalar(newScale);
-                
-                // Feedback with direction arrow
                 const pct = Math.round(newScale * 100);
-                let arrow = '';
-                if (ratio > 1.08) arrow = ' ↑';
-                else if (ratio < 0.92) arrow = ' ↓';
-                
+                const arrow = ratio > 1.05 ? ' ↑' : ratio < 0.95 ? ' ↓' : '';
                 this.showStatus('👌👌', `${pct}%${arrow}`);
             }
             
-            checkTwoHandReset() {
-                const holdDuration = 2000;
+            checkReset() {
                 const elapsed = Date.now() - this.twoHandOpenStart;
-                const progress = Math.min(100, (elapsed / holdDuration) * 100);
-                
+                const progress = Math.min(100, (elapsed / 2000) * 100);
                 this.progressEl.style.setProperty('--progress', `${progress}%`);
                 
-                if (elapsed >= holdDuration) {
-                    // Reset transform
+                if (elapsed >= 2000) {
                     this.app.resetRotation();
-                    if (this.app.obj) {
-                        this.app.obj.scale.setScalar(1);
-                    }
+                    if (this.app.obj) this.app.obj.scale.setScalar(1);
                     this.showStatus('↺', 'Reset!');
-                    log('Transform reset via two-hand open');
-                    
-                    // Prevent re-trigger
                     this.twoHandOpenStart = Date.now() + 1000;
-                    
                     setTimeout(() => {
-                        if (this.state === 'TWO_HAND_EXIT') {
-                            this.showStatus('✋✋', 'Hold 2s to reset');
-                        }
+                        if (this.state === 'TWO_HAND_EXIT') this.showStatus('✋✋', 'Hold to reset');
                     }, 500);
                 }
             }
             
-            // ==================== UI HELPERS ====================
             showStatus(icon, text) {
                 this.statusIcon.textContent = icon;
                 this.statusText.textContent = text;
             }
             
-            showScaleTutorial() {
-                const tutorial = document.createElement('div');
-                tutorial.id = 'scaleTutorial';
-                tutorial.innerHTML = `
-                    <div class="tutorial-content">
-                        <div class="tutorial-gesture">👌 ← → 👌</div>
-                        <div class="tutorial-text">Move hands apart to enlarge</div>
-                        <div class="tutorial-text">Move hands together to shrink</div>
-                        <div class="tutorial-hint">Open both hands ✋✋ to exit</div>
-                    </div>
-                `;
-                tutorial.style.cssText = `
-                    position: fixed;
-                    top: 50%; left: 50%;
-                    transform: translate(-50%, -50%);
-                    background: rgba(0,200,100,0.95);
-                    border-radius: 16px;
-                    padding: 20px 28px;
-                    z-index: 700;
-                    text-align: center;
-                    animation: tutorialPop 0.3s ease-out;
-                    color: #fff;
-                `;
-                
-                document.body.appendChild(tutorial);
-                
-                setTimeout(() => {
-                    if (tutorial.parentNode) {
-                        tutorial.style.opacity = '0';
-                        tutorial.style.transition = 'opacity 0.3s';
-                        setTimeout(() => tutorial.remove(), 300);
-                    }
-                }, 3000);
-            }
-            
-            // ==================== HAND DRAWING ====================
             drawHands(ctx, ovr) {
                 if (!ctx) return;
-                
-                const w = ovr.width;
-                const h = ovr.height;
-                
+                const w = ovr.width, h = ovr.height;
                 ctx.save();
                 ctx.translate(w, 0);
-                ctx.scale(-1, 1); // Mirror
+                ctx.scale(-1, 1);
                 
-                // Draw each hand
                 for (let i = 0; i < this.handsDetected; i++) {
                     const hand = this.handData[i];
-                    if (!hand || !hand.landmarks) continue;
-                    
+                    if (!hand) continue;
                     const lm = hand.landmarks;
                     
-                    // Color based on hand state
-                    let color = '#888'; // Default gray
-                    if (hand.isFist) color = '#ff6600';       // Orange for fist
-                    else if (hand.isPinching) color = '#00ff88'; // Green for pinch
-                    else if (hand.isOpen) color = '#ff4488';     // Pink for open
+                    let color = '#666';
+                    if (hand.isFist) color = '#ff6a00';
+                    else if (hand.isPinching) color = '#00ff88';
+                    else if (hand.isOpen) color = '#ff4466';
                     
-                    // Draw connections
-                    const connections = [
-                        [0,1],[1,2],[2,3],[3,4],
-                        [0,5],[5,6],[6,7],[7,8],
-                        [0,9],[9,10],[10,11],[11,12],
-                        [0,13],[13,14],[14,15],[15,16],
-                        [0,17],[17,18],[18,19],[19,20],
-                        [5,9],[9,13],[13,17]
-                    ];
-                    
+                    const conns = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 2;
-                    
-                    connections.forEach(([a, b]) => {
+                    conns.forEach(([a,b]) => {
                         ctx.beginPath();
                         ctx.moveTo(lm[a].x * w, lm[a].y * h);
                         ctx.lineTo(lm[b].x * w, lm[b].y * h);
                         ctx.stroke();
                     });
                     
-                    // Draw landmarks
                     lm.forEach((pt, idx) => {
                         ctx.beginPath();
-                        const size = [4, 8, 12, 16, 20].includes(idx) ? 4 : 2;
-                        ctx.arc(pt.x * w, pt.y * h, size, 0, Math.PI * 2);
+                        ctx.arc(pt.x * w, pt.y * h, [4,8,12,16,20].includes(idx) ? 4 : 2, 0, Math.PI*2);
                         ctx.fillStyle = '#fff';
                         ctx.fill();
                     });
                     
-                    // Draw pinch point if pinching
-                    if (hand.isPinching && hand.pinchPoint) {
+                    if (hand.isPinching) {
                         ctx.beginPath();
-                        ctx.arc(hand.pinchPoint.x * w, hand.pinchPoint.y * h, 8, 0, Math.PI * 2);
+                        ctx.arc(hand.pinchPoint.x * w, hand.pinchPoint.y * h, 6, 0, Math.PI*2);
                         ctx.fillStyle = '#00ff88';
                         ctx.fill();
                     }
                 }
                 
-                // Draw line between pinch points in scale mode
-                if (this.state === 'TWO_HAND_SCALE') {
-                    const h0 = this.handData[0];
-                    const h1 = this.handData[1];
-                    if (h0 && h1 && h0.pinchPoint && h1.pinchPoint) {
-                        ctx.beginPath();
-                        ctx.setLineDash([5, 5]);
-                        ctx.strokeStyle = '#00ff88';
-                        ctx.lineWidth = 2;
-                        ctx.moveTo(h0.pinchPoint.x * w, h0.pinchPoint.y * h);
-                        ctx.lineTo(h1.pinchPoint.x * w, h1.pinchPoint.y * h);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                    }
+                if (this.state === 'TWO_HAND_SCALE' && this.handData[0] && this.handData[1]) {
+                    const [h0, h1] = this.handData;
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(h0.pinchPoint.x * w, h0.pinchPoint.y * h);
+                    ctx.lineTo(h1.pinchPoint.x * w, h1.pinchPoint.y * h);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
                 
                 ctx.restore();
             }
         }
         
-        // ============ AUTO-ORIENTATION ============
-        function autoOrientGeometry(geo) {
-            geo.computeBoundingBox();
-            const box = geo.boundingBox;
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            
-            log(`Original dims: X=${size.x.toFixed(1)}, Y=${size.y.toFixed(1)}, Z=${size.z.toFixed(1)}`);
-            
-            // Analyze principal axes using vertex positions
-            const pos = geo.attributes.position.array;
-            let varX = 0, varY = 0, varZ = 0;
-            const n = pos.length / 3;
-            
-            // Calculate variance in each axis
-            let sumX = 0, sumY = 0, sumZ = 0;
-            for (let i = 0; i < pos.length; i += 3) {
-                sumX += pos[i];
-                sumY += pos[i + 1];
-                sumZ += pos[i + 2];
-            }
-            const meanX = sumX / n, meanY = sumY / n, meanZ = sumZ / n;
-            
-            for (let i = 0; i < pos.length; i += 3) {
-                varX += (pos[i] - meanX) ** 2;
-                varY += (pos[i + 1] - meanY) ** 2;
-                varZ += (pos[i + 2] - meanZ) ** 2;
-            }
-            
-            // Find which axis has lowest variance (likely the "flat" direction)
-            const vars = [
-                { axis: 'x', val: varX, size: size.x },
-                { axis: 'y', val: varY, size: size.y },
-                { axis: 'z', val: varZ, size: size.z }
-            ];
-            vars.sort((a, b) => a.size - b.size);
-            
-            const thinnest = vars[0].axis;
-            const tallest = vars[2].axis;
-            
-            log(`Thinnest axis: ${thinnest}, Tallest axis: ${tallest}`);
-            
-            // Apply rotation to make model upright
-            // We want the tallest dimension to be Y (up), thinnest to be Z (depth)
-            let rotX = 0, rotZ = 0;
-            
-            if (tallest === 'z') {
-                // Z is tallest, rotate to make it Y
-                rotX = -Math.PI / 2;
-                log('Auto-rotate: X -90° (Z→Y)');
-            } else if (tallest === 'x') {
-                // X is tallest, rotate to make it Y
-                rotZ = Math.PI / 2;
-                log('Auto-rotate: Z +90° (X→Y)');
-            }
-            
-            // If after rotation the model is very flat in Z, it might be lying down
-            if (thinnest === 'y' && tallest !== 'y') {
-                rotX = -Math.PI / 2;
-                log('Auto-rotate: X -90° (flat model)');
-            }
-            
-            return { rotX, rotY: 0, rotZ };
-        }
-        
         // ============ MAIN APP ============
         class App {
             constructor() {
-                log('App starting...');
-                
                 this.vid = $('vid');
                 this.ovr = $('ovr');
                 this.ctx = null;
-                this.detector = null;
                 
                 this.scene = null;
                 this.camera = null;
                 this.renderer = null;
                 this.obj = null;
-                this.room = null;
+                this.tesseract = null;
+                this.particles = null;
                 
                 this.face = { x: 0, y: 0, z: 400 };
                 this.smooth = { x: 0, y: 0, z: 400 };
                 this.tracking = false;
-                this.faceCount = 0;
                 
-                // Mode system
-                this.mode = 'view'; // 'view' or 'edit'
+                this.mode = 'view';
                 this.modelRotation = { x: 0, y: 0, z: 0 };
-                this.baseRotation = { x: 0, y: 0, z: 0 }; // Store initial rotation
+                this.baseRotation = { x: 0, y: 0, z: 0 };
                 
-                // Touch rotation
-                this.touchStart = null;
-                this.lastTouchDist = 0;
-                
-                // Hand controller
                 this.handController = null;
+                this.detector = null;
+                
+                this.lastTime = performance.now();
                 
                 this.init();
             }
             
             async init() {
-                try {
-                    log('Init 3D...');
-                    this.setup3D();
-                    stat('sModel', 'sneaker', 'ok');
-                    
-                    log('Init camera...');
-                    await this.setupCamera();
-                    
-                    log('Init tracking...');
-                    await this.setupTracking();
-                    
-                    log('Init UI...');
-                    this.setupUI();
-                    
-                    log('Init touch rotation...');
-                    this.setupTouchRotation();
-                    
-                    log('Init hand controller...');
-                    this.handController = new HandController(this);
-                    await this.handController.init();
-                    
-                    log('Starting render...');
-                    this.animate();
-                    
-                    log('Ready!', 'ok');
-                } catch (err) {
-                    log(`Error: ${err.message}`, 'e');
-                }
+                this.setup3D();
+                await this.setupCamera();
+                await this.setupTracking();
+                this.handController = new HandController(this);
+                await this.handController.init();
+                this.setupUI();
+                this.animate();
+                log('App ready', 'ok');
             }
             
             setup3D() {
                 const canvas = $('canvas3d');
                 this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x08080c, 0.0015);
+                
                 this.camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 1, 5000);
                 this.camera.position.z = 400;
                 
                 this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
                 this.renderer.setSize(innerWidth, innerHeight);
                 this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-                this.renderer.setClearColor(0x050508);
+                this.renderer.setClearColor(0x08080c);
                 
-                // Lights
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-                const main = new THREE.DirectionalLight(0xffffff, 1);
-                main.position.set(50, 100, 100);
-                this.scene.add(main);
-                const back = new THREE.DirectionalLight(0xff6600, 0.5);
-                back.position.set(-50, -50, -100);
-                this.scene.add(back);
-                const blue = new THREE.PointLight(0x0066ff, 0.4, 500);
-                blue.position.set(0, 100, -150);
-                this.scene.add(blue);
+                // Lighting
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+                const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                keyLight.position.set(50, 100, 100);
+                this.scene.add(keyLight);
+                const rimLight = new THREE.DirectionalLight(0x00f0ff, 0.4);
+                rimLight.position.set(-50, -50, -100);
+                this.scene.add(rimLight);
+                const accentLight = new THREE.PointLight(0xff6a00, 0.5, 800);
+                accentLight.position.set(0, 150, -200);
+                this.scene.add(accentLight);
                 
                 this.createRoom();
-                this.makeObj('sneaker');
+                this.createParticles();
+                this.makeObj('cube');
             }
             
             createRoom() {
-                this.room = new THREE.Group();
-                const gc = 0xff6600, gd = 0x1a0800;
-                const D = 400, W = 350, H = 250;
+                const room = new THREE.Group();
+                const gc = 0xff6a00, gd = 0x1a0a00;
+                const D = 500, W = 400, H = 300;
                 
-                const floor = new THREE.GridHelper(W*2, 24, gc, gd);
+                // Floor with gradient opacity (brighter near, dimmer far)
+                const floor = new THREE.GridHelper(W*2, 32, gc, gd);
                 floor.position.set(0, -H/2, -D/2);
                 floor.material.transparent = true;
-                floor.material.opacity = 0.7;
-                this.room.add(floor);
+                floor.material.opacity = 0.6;
+                room.add(floor);
                 
-                const back = new THREE.GridHelper(W*2, 24, gc, gd);
+                // Back wall
+                const back = new THREE.GridHelper(W*2, 32, gc, gd);
                 back.rotation.x = Math.PI/2;
                 back.position.z = -D;
                 back.material.transparent = true;
-                back.material.opacity = 0.6;
-                this.room.add(back);
+                back.material.opacity = 0.4;
+                room.add(back);
                 
-                const left = new THREE.GridHelper(D, 16, gc, gd);
-                left.rotation.z = Math.PI/2;
-                left.position.set(-W, 0, -D/2);
-                left.material.transparent = true;
-                left.material.opacity = 0.4;
-                this.room.add(left);
-                
-                const right = new THREE.GridHelper(D, 16, gc, gd);
-                right.rotation.z = Math.PI/2;
-                right.position.set(W, 0, -D/2);
-                right.material.transparent = true;
-                right.material.opacity = 0.4;
-                this.room.add(right);
-                
-                const ceil = new THREE.GridHelper(W*2, 24, gc, gd);
-                ceil.position.set(0, H/2, -D/2);
-                ceil.material.transparent = true;
-                ceil.material.opacity = 0.15;
-                this.room.add(ceil);
-                
-                const lm = new THREE.LineBasicMaterial({color: gc, transparent: true, opacity: 0.5});
-                [[-W,-H/2],[W,-H/2],[-W,H/2],[W,H/2]].forEach(([x,y]) => {
-                    const g = new THREE.BufferGeometry().setFromPoints([
-                        new THREE.Vector3(x,y,0), new THREE.Vector3(x,y,-D)
-                    ]);
-                    this.room.add(new THREE.Line(g, lm));
+                // Side walls (subtle)
+                [-1, 1].forEach(side => {
+                    const wall = new THREE.GridHelper(D, 20, gc, gd);
+                    wall.rotation.z = Math.PI/2;
+                    wall.position.set(side * W, 0, -D/2);
+                    wall.material.transparent = true;
+                    wall.material.opacity = 0.2;
+                    room.add(wall);
                 });
                 
-                const hg = new THREE.PlaneGeometry(W*3, 4);
-                const hm = new THREE.MeshBasicMaterial({color: gc, transparent: true, opacity: 0.8});
-                const hz = new THREE.Mesh(hg, hm);
-                hz.position.set(0, -H/2+2, -D+1);
-                this.room.add(hz);
+                // Ceiling (very subtle)
+                const ceil = new THREE.GridHelper(W*2, 32, gc, gd);
+                ceil.position.set(0, H/2, -D/2);
+                ceil.material.transparent = true;
+                ceil.material.opacity = 0.08;
+                room.add(ceil);
                 
-                this.scene.add(this.room);
+                // Corner edge lines
+                const edgeMat = new THREE.LineBasicMaterial({ color: gc, transparent: true, opacity: 0.4 });
+                [[-W,-H/2], [W,-H/2], [-W,H/2], [W,H/2]].forEach(([x,y]) => {
+                    const geo = new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(x, y, 0),
+                        new THREE.Vector3(x, y, -D)
+                    ]);
+                    room.add(new THREE.Line(geo, edgeMat));
+                });
+                
+                // Horizon glow line
+                const horizonGeo = new THREE.PlaneGeometry(W*3, 6);
+                const horizonMat = new THREE.MeshBasicMaterial({
+                    color: gc,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const horizon = new THREE.Mesh(horizonGeo, horizonMat);
+                horizon.position.set(0, -H/2 + 3, -D + 2);
+                room.add(horizon);
+                
+                // Ground glow plane
+                const glowGeo = new THREE.PlaneGeometry(W*2, D);
+                const glowMat = new THREE.MeshBasicMaterial({
+                    color: gc,
+                    transparent: true,
+                    opacity: 0.05,
+                    side: THREE.DoubleSide
+                });
+                const glow = new THREE.Mesh(glowGeo, glowMat);
+                glow.rotation.x = -Math.PI/2;
+                glow.position.set(0, -H/2 + 1, -D/2);
+                room.add(glow);
+                
+                this.scene.add(room);
+            }
+            
+            createParticles() {
+                const count = 100;
+                const positions = new Float32Array(count * 3);
+                
+                for (let i = 0; i < count; i++) {
+                    positions[i*3] = (Math.random() - 0.5) * 800;
+                    positions[i*3+1] = (Math.random() - 0.5) * 400;
+                    positions[i*3+2] = -Math.random() * 500;
+                }
+                
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const mat = new THREE.PointsMaterial({
+                    color: 0xff6a00,
+                    size: 2,
+                    transparent: true,
+                    opacity: 0.4,
+                    sizeAttenuation: true
+                });
+                
+                this.particles = new THREE.Points(geo, mat);
+                this.scene.add(this.particles);
             }
             
             makeObj(type) {
                 if (this.obj) this.scene.remove(this.obj);
+                this.tesseract = null;
                 $('modelInfo').classList.remove('show');
-                stat('sModel', type, 'ok');
                 
-                // Reset rotation for built-in objects
                 this.modelRotation = { x: 0, y: 0, z: 0 };
                 this.baseRotation = { x: 0, y: 0, z: 0 };
                 
-                const g = new THREE.Group();
-                
-                if (type === 'sneaker') {
-                    const s = 1.4;
-                    const sole = new THREE.Mesh(new THREE.BoxGeometry(130*s,12*s,50*s), new THREE.MeshPhysicalMaterial({color:0x0a0a0a,roughness:0.9}));
-                    sole.position.y = -45*s; g.add(sole);
+                if (type === 'cube') {
+                    const g = new THREE.Group();
                     
-                    const mid = new THREE.Mesh(new THREE.BoxGeometry(125*s,22*s,48*s), new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:0.3}));
-                    mid.position.y = -28*s; g.add(mid);
+                    // Solid cube with nice material
+                    const cube = new THREE.Mesh(
+                        new THREE.BoxGeometry(90, 90, 90),
+                        new THREE.MeshPhysicalMaterial({
+                            color: 0xff6a00,
+                            metalness: 0.3,
+                            roughness: 0.4,
+                            clearcoat: 0.5
+                        })
+                    );
+                    g.add(cube);
                     
-                    const upper = new THREE.Mesh(new THREE.BoxGeometry(115*s,45*s,44*s), new THREE.MeshPhysicalMaterial({color:0x1a1a1a,roughness:0.7}));
-                    upper.position.y = 5*s; g.add(upper);
+                    // Wireframe overlay for depth
+                    const wire = new THREE.Mesh(
+                        new THREE.BoxGeometry(92, 92, 92),
+                        new THREE.MeshBasicMaterial({
+                            color: 0xffffff,
+                            wireframe: true,
+                            transparent: true,
+                            opacity: 0.15
+                        })
+                    );
+                    g.add(wire);
                     
-                    const toe = new THREE.Mesh(new THREE.SphereGeometry(28*s,20,20), new THREE.MeshPhysicalMaterial({color:0x252525}));
-                    toe.position.set(50*s,0,0); toe.scale.set(1.3,0.65,1); g.add(toe);
+                    // Edge glow
+                    const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(90, 90, 90));
+                    const edgeLine = new THREE.LineSegments(
+                        edges,
+                        new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.4 })
+                    );
+                    g.add(edgeLine);
                     
-                    for (let i=0; i<3; i++) {
-                        const st = new THREE.Mesh(new THREE.BoxGeometry(5*s,35*s,46*s), new THREE.MeshBasicMaterial({color:0xff6600}));
-                        st.position.set((-15+i*25)*s,8*s,0); st.rotation.z=0.2; g.add(st);
-                    }
-                    
-                    const heel = new THREE.Mesh(new THREE.BoxGeometry(16*s,35*s,22*s), new THREE.MeshPhysicalMaterial({color:0xffcc00}));
-                    heel.position.set(-58*s,18*s,0); g.add(heel);
-                    
-                    this.baseRotation.y = -0.35;
-                    g.position.set(0, 20, -80);
-                    
-                } else if (type === 'cube') {
-                    const c = new THREE.Mesh(new THREE.BoxGeometry(100,100,100), new THREE.MeshPhysicalMaterial({color:0xff6600,metalness:0.4,clearcoat:0.8}));
-                    g.add(c);
-                    const w = new THREE.Mesh(new THREE.BoxGeometry(102,102,102), new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:0.3}));
-                    g.add(w);
                     g.position.z = -80;
+                    this.obj = g;
+                    
+                } else if (type === 'tesseract') {
+                    this.tesseract = new Tesseract();
+                    this.obj = this.tesseract.group;
+                    
+                } else if (type === 'torus') {
+                    const g = new THREE.Group();
+                    const knot = new THREE.Mesh(
+                        new THREE.TorusKnotGeometry(50, 15, 100, 16),
+                        new THREE.MeshPhysicalMaterial({
+                            color: 0xff6a00,
+                            metalness: 0.3,
+                            roughness: 0.4,
+                            clearcoat: 0.5
+                        })
+                    );
+                    g.add(knot);
+                    
+                    // Wireframe overlay
+                    const wire = new THREE.Mesh(
+                        new THREE.TorusKnotGeometry(50, 15, 100, 16),
+                        new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.1 })
+                    );
+                    g.add(wire);
+                    
+                    g.position.z = -80;
+                    this.obj = g;
                     
                 } else if (type === 'gem') {
-                    const gm = new THREE.Mesh(new THREE.OctahedronGeometry(70,0), new THREE.MeshPhysicalMaterial({color:0xff00ff,clearcoat:1,transparent:true,opacity:0.9}));
-                    g.add(gm);
-                    [0x00ffff,0xff00ff,0xffff00].forEach((c,i) => {
-                        const r = new THREE.Mesh(new THREE.TorusGeometry(90+i*25,2,8,64), new THREE.MeshBasicMaterial({color:c}));
-                        r.rotation.x = Math.PI/2+i*0.4; r.rotation.y = i*0.5;
-                        r.userData.spd = 0.01+i*0.005;
-                        g.add(r);
+                    const g = new THREE.Group();
+                    const gem = new THREE.Mesh(
+                        new THREE.OctahedronGeometry(60, 0),
+                        new THREE.MeshPhysicalMaterial({
+                            color: 0x00f0ff,
+                            metalness: 0.1,
+                            roughness: 0.1,
+                            clearcoat: 1,
+                            transparent: true,
+                            opacity: 0.9
+                        })
+                    );
+                    g.add(gem);
+                    
+                    // Orbiting rings
+                    [0xff6a00, 0x00f0ff, 0xff4466].forEach((c, i) => {
+                        const ring = new THREE.Mesh(
+                            new THREE.TorusGeometry(80 + i*20, 1.5, 8, 64),
+                            new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6 })
+                        );
+                        ring.rotation.x = Math.PI/2 + i*0.4;
+                        ring.rotation.y = i*0.5;
+                        ring.userData.speed = 0.008 + i*0.004;
+                        g.add(ring);
                     });
+                    
                     g.position.z = -80;
+                    this.obj = g;
                 }
                 
-                this.obj = g;
-                this.scene.add(this.obj);
-                log(`Object: ${type}`);
+                if (this.obj) this.scene.add(this.obj);
             }
             
             loadModel(file) {
                 const ext = file.name.split('.').pop().toLowerCase();
-                log(`Loading ${ext.toUpperCase()}: ${file.name}`);
                 $('loading').classList.add('show');
                 $('loadTxt').textContent = `Loading ${file.name}...`;
-                stat('sModel', 'loading...', 'w');
                 
                 const reader = new FileReader();
-                
                 reader.onload = (e) => {
                     try {
-                        let geo;
+                        const geo = ext === 'obj' 
+                            ? parseOBJ(typeof e.target.result === 'string' ? e.target.result : new TextDecoder().decode(e.target.result))
+                            : parseSTL(e.target.result);
                         
-                        if (ext === 'obj') {
-                            // OBJ is text-based
-                            const text = typeof e.target.result === 'string' 
-                                ? e.target.result 
-                                : new TextDecoder().decode(e.target.result);
-                            geo = parseOBJ(text);
-                        } else {
-                            // STL can be binary or ASCII
-                            geo = parseSTL(e.target.result);
-                        }
-                        
-                        // Auto-orient BEFORE centering
-                        const autoRot = autoOrientGeometry(geo);
-                        
-                        // Apply auto-rotation to geometry
-                        if (autoRot.rotX !== 0 || autoRot.rotZ !== 0) {
-                            const matrix = new THREE.Matrix4();
-                            const euler = new THREE.Euler(autoRot.rotX, autoRot.rotY, autoRot.rotZ);
-                            matrix.makeRotationFromEuler(euler);
-                            geo.applyMatrix4(matrix);
-                        }
-                        
-                        // Now center geometry
                         geo.computeBoundingBox();
                         const box = geo.boundingBox;
                         const center = new THREE.Vector3();
                         box.getCenter(center);
                         geo.translate(-center.x, -center.y, -center.z);
                         
-                        // Scale to fit
                         const size = new THREE.Vector3();
                         box.getSize(size);
-                        const maxDim = Math.max(size.x, size.y, size.z);
-                        const scale = 150 / maxDim;
+                        const scale = 120 / Math.max(size.x, size.y, size.z);
                         geo.scale(scale, scale, scale);
-                        
-                        log(`Final dims: ${(size.x*scale).toFixed(0)}x${(size.y*scale).toFixed(0)}x${(size.z*scale).toFixed(0)}`);
-                        
                         geo.computeVertexNormals();
                         
                         if (this.obj) this.scene.remove(this.obj);
+                        this.tesseract = null;
                         
                         const mat = new THREE.MeshPhysicalMaterial({
-                            color: 0xff6600,
+                            color: 0xff6a00,
                             metalness: 0.3,
                             roughness: 0.4,
                             clearcoat: 0.3,
@@ -1693,193 +1482,37 @@
                         group.add(mesh);
                         group.position.z = -80;
                         
-                        // Reset rotation tracking for new model
                         this.modelRotation = { x: 0, y: 0, z: 0 };
                         this.baseRotation = { x: 0, y: 0, z: 0 };
-                        
                         this.obj = group;
                         this.scene.add(this.obj);
                         
                         $('modelName').textContent = file.name;
+                        $('modelMeta').textContent = `${Math.round(geo.attributes.position.count/3)} faces`;
                         $('modelInfo').classList.add('show');
-                        document.querySelectorAll('.ob').forEach(b => b.classList.remove('on'));
+                        document.querySelectorAll('.obj-btn').forEach(b => b.classList.remove('active'));
                         
-                        stat('sModel', file.name.slice(0,10), 'ok');
                         $('loading').classList.remove('show');
-                        log(`Loaded: ${file.name}`, 'ok');
-                        
                     } catch (err) {
                         $('loading').classList.remove('show');
-                        stat('sModel', 'ERROR', 'err');
-                        log(`Load Error: ${err.message}`, 'e');
-                        alert(`Error loading ${ext.toUpperCase()}:\n` + err.message);
+                        alert('Error loading model: ' + err.message);
                     }
                 };
-                
                 reader.onerror = () => {
                     $('loading').classList.remove('show');
-                    stat('sModel', 'ERROR', 'err');
-                    log('File read error', 'e');
                     alert('Error reading file');
                 };
-                
-                // Read as appropriate type
-                if (ext === 'obj') {
-                    reader.readAsText(file);
-                } else {
-                    reader.readAsArrayBuffer(file);
-                }
-            }
-            
-            // ============ MODE SYSTEM ============
-            setMode(mode) {
-                this.mode = mode;
-                const btn = $('modeToggle');
-                const controls = $('rotControls');
-                const pip = $('pip');
-                const hint = $('editHint');
-                
-                if (mode === 'view') {
-                    btn.classList.remove('edit');
-                    btn.innerHTML = '<span class="icon">👁️</span><span class="label">VIEW MODE</span>';
-                    controls.classList.remove('show');
-                    pip.classList.remove('paused');
-                    stat('sMode', 'VIEW', 'ok');
-                    log('Mode: VIEW (parallax on)');
-                    
-                    // Stop hand controller
-                    if (this.handController) {
-                        this.handController.stop();
-                    }
-                } else {
-                    btn.classList.add('edit');
-                    btn.innerHTML = '<span class="icon">✋</span><span class="label">EDIT MODE</span>';
-                    controls.classList.add('show');
-                    pip.classList.add('paused');
-                    stat('sMode', 'EDIT', 'w');
-                    log('Mode: EDIT (parallax paused)');
-                    
-                    // Start hand controller
-                    if (this.handController && this.handController.ready) {
-                        this.handController.start();
-                    } else {
-                        // Show hint for touch controls if no hand tracking
-                        hint.classList.add('show');
-                        setTimeout(() => hint.classList.remove('show'), 2000);
-                    }
-                }
-            }
-            
-            toggleMode() {
-                this.setMode(this.mode === 'view' ? 'edit' : 'view');
-            }
-            
-            rotateModel(axis, angleDeg) {
-                const angle = (angleDeg * Math.PI) / 180;
-                this.modelRotation[axis] += angle;
-                log(`Rotate ${axis.toUpperCase()}: ${angleDeg > 0 ? '+' : ''}${angleDeg}°`);
-            }
-            
-            resetRotation() {
-                this.modelRotation = { x: 0, y: 0, z: 0 };
-                log('Rotation reset');
-            }
-            
-            // ============ TOUCH ROTATION ============
-            setupTouchRotation() {
-                const canvas = $('canvas3d');
-                
-                // Track touches
-                canvas.addEventListener('touchstart', (e) => {
-                    if (this.mode !== 'edit') return;
-                    
-                    if (e.touches.length === 2) {
-                        e.preventDefault();
-                        const t1 = e.touches[0];
-                        const t2 = e.touches[1];
-                        this.touchStart = {
-                            x: (t1.clientX + t2.clientX) / 2,
-                            y: (t1.clientY + t2.clientY) / 2,
-                            rotX: this.modelRotation.x,
-                            rotY: this.modelRotation.y
-                        };
-                        log('Touch rotate start');
-                    }
-                }, { passive: false });
-                
-                canvas.addEventListener('touchmove', (e) => {
-                    if (this.mode !== 'edit' || !this.touchStart) return;
-                    
-                    if (e.touches.length === 2) {
-                        e.preventDefault();
-                        const t1 = e.touches[0];
-                        const t2 = e.touches[1];
-                        const cx = (t1.clientX + t2.clientX) / 2;
-                        const cy = (t1.clientY + t2.clientY) / 2;
-                        
-                        const dx = cx - this.touchStart.x;
-                        const dy = cy - this.touchStart.y;
-                        
-                        // Convert drag to rotation
-                        const sensitivity = 0.01;
-                        this.modelRotation.y = this.touchStart.rotY + dx * sensitivity;
-                        this.modelRotation.x = this.touchStart.rotX + dy * sensitivity;
-                    }
-                }, { passive: false });
-                
-                canvas.addEventListener('touchend', () => {
-                    if (this.touchStart) {
-                        this.touchStart = null;
-                        log('Touch rotate end');
-                    }
-                });
-                
-                // Mouse fallback for desktop
-                let mouseDown = false;
-                let mouseStart = null;
-                
-                canvas.addEventListener('mousedown', (e) => {
-                    if (this.mode !== 'edit') return;
-                    mouseDown = true;
-                    mouseStart = {
-                        x: e.clientX,
-                        y: e.clientY,
-                        rotX: this.modelRotation.x,
-                        rotY: this.modelRotation.y
-                    };
-                });
-                
-                canvas.addEventListener('mousemove', (e) => {
-                    if (!mouseDown || this.mode !== 'edit' || !mouseStart) return;
-                    
-                    const dx = e.clientX - mouseStart.x;
-                    const dy = e.clientY - mouseStart.y;
-                    
-                    const sensitivity = 0.005;
-                    this.modelRotation.y = mouseStart.rotY + dx * sensitivity;
-                    this.modelRotation.x = mouseStart.rotX + dy * sensitivity;
-                });
-                
-                canvas.addEventListener('mouseup', () => {
-                    mouseDown = false;
-                    mouseStart = null;
-                });
-                
-                canvas.addEventListener('mouseleave', () => {
-                    mouseDown = false;
-                    mouseStart = null;
-                });
+                ext === 'obj' ? reader.readAsText(file) : reader.readAsArrayBuffer(file);
             }
             
             async setupCamera() {
-                stat('sCam', '...', '');
+                setDebug('dCam', '...', '');
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
                         audio: false
                     });
                     this.vid.srcObject = stream;
-                    
                     await new Promise((res, rej) => {
                         this.vid.onloadedmetadata = () => {
                             this.ovr.width = this.vid.videoWidth;
@@ -1889,291 +1522,152 @@
                         };
                         setTimeout(() => rej(new Error('Timeout')), 8000);
                     });
-                    
-                    stat('sCam', 'OK', 'ok');
-                    log(`Cam: ${this.vid.videoWidth}x${this.vid.videoHeight}`);
+                    setDebug('dCam', 'OK', 'ok');
+                    $('pipStatus').textContent = 'READY';
+                    $('pipStatus').classList.remove('off');
                 } catch (err) {
-                    stat('sCam', 'FAIL', 'err');
-                    log(`Cam error: ${err.message}`, 'e');
-                    this.setupTouch();
+                    setDebug('dCam', 'FAIL', 'err');
+                    $('pipStatus').textContent = 'NO CAM';
+                    $('pipStatus').classList.add('off');
+                    this.setupTouchFallback();
                 }
             }
             
-            setupTouch() {
-                stat('sTrack', 'Touch', 'w');
-                log('Using touch fallback', 'w');
-                
-                const upd = (x, y) => {
-                    if (this.mode !== 'view') return; // Only track in view mode
+            setupTouchFallback() {
+                setDebug('dTrack', 'Touch', '');
+                const update = (x, y) => {
+                    if (this.mode !== 'view') return;
                     this.face.x = -((x/innerWidth) - 0.5) * 400;
                     this.face.y = -((y/innerHeight) - 0.5) * 300;
                     this.tracking = true;
-                    $('dot').classList.add('on');
-                    stat('sFace', 'Touch', 'ok');
                 };
-                
-                document.addEventListener('mousemove', e => upd(e.clientX, e.clientY));
+                document.addEventListener('mousemove', e => update(e.clientX, e.clientY));
                 document.addEventListener('touchmove', e => {
-                    if (e.touches.length === 1 && this.mode === 'view') {
-                        upd(e.touches[0].clientX, e.touches[0].clientY);
-                    }
+                    if (e.touches.length === 1) update(e.touches[0].clientX, e.touches[0].clientY);
                 }, { passive: true });
             }
             
             async setupTracking() {
                 if (!this.vid.srcObject) {
-                    stat('sTrack', 'None', 'err');
+                    setDebug('dTrack', 'None', 'err');
                     return;
                 }
                 
-                stat('sTrack', '...', '');
+                setDebug('dTrack', '...', '');
                 
                 if (typeof FaceDetection !== 'undefined') {
                     try {
-                        log('Trying MediaPipe...');
                         this.detector = new FaceDetection({
                             locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${f}`
                         });
                         this.detector.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
                         this.detector.onResults(r => this.onFace(r));
-                        stat('sTrack', 'MediaPipe', 'ok');
-                        log('MediaPipe ready');
-                        this.runDetection();
+                        setDebug('dTrack', 'Face', 'ok');
+                        this.runFaceDetection();
                         return;
                     } catch (err) {
-                        log(`MediaPipe failed: ${err.message}`, 'w');
+                        log(`Face detection failed: ${err.message}`, 'w');
                     }
                 }
                 
-                if ('FaceDetector' in window) {
-                    try {
-                        log('Trying Native...');
-                        this.nativeDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-                        stat('sTrack', 'Native', 'ok');
-                        log('Native ready');
-                        this.runNative();
-                        return;
-                    } catch (err) {
-                        log(`Native failed: ${err.message}`, 'w');
-                    }
-                }
-                
-                stat('sTrack', 'Simple', 'w');
-                log('Using simple tracking', 'w');
-                this.runSimple();
+                setDebug('dTrack', 'Basic', '');
+                this.setupTouchFallback();
             }
             
-            runDetection() {
-                const run = async () => {
+            runFaceDetection() {
+                const detect = async () => {
                     if (this.detector && this.vid.readyState >= 2 && this.mode === 'view') {
-                        try {
-                            await this.detector.send({ image: this.vid });
-                        } catch (e) {}
+                        try { await this.detector.send({ image: this.vid }); } catch(e) {}
                     }
-                    requestAnimationFrame(run);
+                    requestAnimationFrame(detect);
                 };
-                run();
-            }
-            
-            runNative() {
-                const run = async () => {
-                    if (this.nativeDetector && this.vid.readyState >= 2 && this.mode === 'view') {
-                        try {
-                            const faces = await this.nativeDetector.detect(this.vid);
-                            this.processNative(faces);
-                        } catch (e) {}
-                    }
-                    requestAnimationFrame(run);
-                };
-                run();
-            }
-            
-            runSimple() {
-                const tmp = document.createElement('canvas');
-                tmp.width = 64; tmp.height = 48;
-                const tc = tmp.getContext('2d');
-                
-                const run = () => {
-                    if (this.vid.readyState >= 2 && this.mode === 'view') {
-                        tc.drawImage(this.vid, 0, 0, 64, 48);
-                        const d = tc.getImageData(0, 0, 64, 48).data;
-                        
-                        let maxB = 0, bx = 32, by = 24;
-                        for (let y = 10; y < 38; y += 3) {
-                            for (let x = 16; x < 48; x += 3) {
-                                const i = (y * 64 + x) * 4;
-                                const b = d[i] + d[i+1] + d[i+2];
-                                if (b > maxB) { maxB = b; bx = x; by = y; }
-                            }
-                        }
-                        
-                        if (maxB > 250) {
-                            this.face.x = -(((bx/64) - 0.5) * 2) * 250;
-                            this.face.y = -(((by/48) - 0.5) * 2) * 180;
-                            this.tracking = true;
-                            $('dot').classList.add('on');
-                            stat('sFace', 'YES', 'ok');
-                            this.drawDot(bx/64, by/48);
-                        } else {
-                            this.tracking = false;
-                            $('dot').classList.remove('on');
-                            stat('sFace', 'NO', 'err');
-                        }
-                        stat('sX', this.face.x.toFixed(0));
-                        stat('sY', this.face.y.toFixed(0));
-                    }
-                    requestAnimationFrame(run);
-                };
-                run();
+                detect();
             }
             
             onFace(results) {
                 if (this.mode !== 'view') return;
                 
-                if (this.ctx) this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
-                
                 if (results.detections && results.detections.length > 0) {
-                    this.faceCount++;
                     const b = results.detections[0].boundingBox;
-                    
-                    this.drawBox(b.xCenter, b.yCenter, b.width, b.height);
-                    
                     this.face.x = -(b.xCenter - 0.5) * 2 * 250;
                     this.face.y = -(b.yCenter - 0.5) * 2 * 180;
-                    
                     const fSize = Math.max(b.width, b.height);
                     this.face.z = Math.max(200, Math.min(700, 350 / Math.max(0.15, fSize)));
-                    
                     this.tracking = true;
-                    $('dot').classList.add('on');
-                    stat('sFace', `#${this.faceCount}`, 'ok');
+                    $('rec').classList.add('on');
+                    $('pipStatus').textContent = 'TRACKING';
                 } else {
                     this.tracking = false;
-                    $('dot').classList.remove('on');
-                    stat('sFace', 'NO', 'err');
+                    $('rec').classList.remove('on');
+                    $('pipStatus').textContent = 'SEARCHING';
                 }
-                stat('sX', this.face.x.toFixed(0));
-                stat('sY', this.face.y.toFixed(0));
             }
             
-            processNative(faces) {
-                if (this.mode !== 'view') return;
+            setMode(mode) {
+                this.mode = mode;
+                setDebug('dMode', mode.toUpperCase());
                 
-                if (this.ctx) this.ctx.clearRect(0, 0, this.ovr.width, this.ovr.height);
+                document.querySelectorAll('.mode-btn').forEach(b => {
+                    b.classList.remove('active');
+                    if (b.dataset.mode === mode) b.classList.add('active');
+                });
                 
-                if (faces.length > 0) {
-                    this.faceCount++;
-                    const f = faces[0].boundingBox;
-                    const cx = (f.x + f.width/2) / this.vid.videoWidth;
-                    const cy = (f.y + f.height/2) / this.vid.videoHeight;
-                    
-                    this.drawBox(cx, cy, f.width/this.vid.videoWidth, f.height/this.vid.videoHeight);
-                    
-                    this.face.x = -(cx - 0.5) * 2 * 250;
-                    this.face.y = -(cy - 0.5) * 2 * 180;
-                    
-                    this.tracking = true;
-                    $('dot').classList.add('on');
-                    stat('sFace', `#${this.faceCount}`, 'ok');
+                if (mode === 'view') {
+                    document.querySelector('.mode-btn[data-mode="view"]').classList.remove('edit');
+                    $('objectSelector').classList.remove('hidden');
+                    $('pip').classList.remove('edit-mode');
+                    if (this.handController) this.handController.stop();
                 } else {
-                    this.tracking = false;
-                    $('dot').classList.remove('on');
-                    stat('sFace', 'NO', 'err');
+                    document.querySelector('.mode-btn[data-mode="edit"]').classList.add('edit');
+                    $('objectSelector').classList.add('hidden');
+                    $('pip').classList.add('edit-mode');
+                    if (this.handController && this.handController.ready) {
+                        this.handController.start();
+                    }
                 }
-                stat('sX', this.face.x.toFixed(0));
-                stat('sY', this.face.y.toFixed(0));
             }
             
-            drawBox(cx, cy, w, h) {
-                if (!this.ctx) return;
-                const c = this.ctx, ow = this.ovr.width, oh = this.ovr.height;
-                c.save();
-                c.translate(ow, 0);
-                c.scale(-1, 1);
-                
-                const x = cx * ow, y = cy * oh;
-                c.strokeStyle = '#ff6600';
-                c.lineWidth = 2;
-                c.strokeRect(x - (w*ow)/2, y - (h*oh)/2, w*ow, h*oh);
-                
-                c.beginPath();
-                c.arc(x, y, 5, 0, Math.PI*2);
-                c.fillStyle = '#ff6600';
-                c.fill();
-                
-                c.restore();
-            }
-            
-            drawDot(nx, ny) {
-                if (!this.ctx) return;
-                const c = this.ctx;
-                c.clearRect(0, 0, this.ovr.width, this.ovr.height);
-                c.save();
-                c.translate(this.ovr.width, 0);
-                c.scale(-1, 1);
-                c.beginPath();
-                c.arc(nx * this.ovr.width, ny * this.ovr.height, 10, 0, Math.PI*2);
-                c.strokeStyle = '#ff6600';
-                c.lineWidth = 2;
-                c.stroke();
-                c.restore();
+            resetRotation() {
+                this.modelRotation = { x: 0, y: 0, z: 0 };
             }
             
             setupUI() {
-                // Object buttons
-                document.querySelectorAll('.ob').forEach(b => {
-                    b.onclick = () => {
-                        document.querySelectorAll('.ob').forEach(x => x.classList.remove('on'));
-                        b.classList.add('on');
-                        this.makeObj(b.dataset.o);
+                // Object selector
+                document.querySelectorAll('.obj-btn[data-obj]').forEach(btn => {
+                    btn.onclick = () => {
+                        document.querySelectorAll('.obj-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.makeObj(btn.dataset.obj);
                     };
                 });
                 
                 // Upload
-                $('uploadBtn').onclick = () => {
-                    log('Upload clicked');
-                    $('fileInput').click();
-                };
-                
+                $('uploadBtn').onclick = () => $('fileInput').click();
                 $('fileInput').onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
-                        this.loadModel(file);
-                    }
+                    if (e.target.files[0]) this.loadModel(e.target.files[0]);
                     e.target.value = '';
                 };
                 
                 // Clear model
                 $('clearModel').onclick = () => {
-                    this.makeObj('sneaker');
-                    document.querySelector('.ob[data-o="sneaker"]').classList.add('on');
+                    this.makeObj('cube');
+                    document.querySelector('.obj-btn[data-obj="cube"]').classList.add('active');
                 };
                 
                 // Mode toggle
-                $('modeToggle').onclick = () => this.toggleMode();
-                
-                // Rotation buttons
-                document.querySelectorAll('#rotControls button[data-axis]').forEach(btn => {
-                    btn.onclick = () => {
-                        const axis = btn.dataset.axis;
-                        const dir = parseInt(btn.dataset.dir);
-                        this.rotateModel(axis, dir * 90);
-                    };
+                document.querySelectorAll('.mode-btn').forEach(btn => {
+                    btn.onclick = () => this.setMode(btn.dataset.mode);
                 });
                 
-                // Reset rotation
-                $('resetRot').onclick = () => this.resetRotation();
-                
-                // Help button
-                $('helpBtn').onclick = () => {
-                    $('gestureHelp').classList.add('show');
+                // Debug toggle
+                $('debugToggle').onclick = () => {
+                    $('debugPanel').classList.toggle('show');
+                    $('debugToggle').classList.toggle('active');
                 };
                 
-                // Close help
-                $('closeHelp').onclick = () => {
-                    $('gestureHelp').classList.remove('show');
-                };
+                // Help
+                $('helpBtn').onclick = () => $('gestureHelp').classList.add('show');
+                $('closeHelp').onclick = () => $('gestureHelp').classList.remove('show');
                 
                 // Resize
                 window.addEventListener('resize', () => {
@@ -2182,11 +1676,55 @@
                     this.renderer.setSize(innerWidth, innerHeight);
                 });
                 
-                log('UI ready');
+                // Touch rotation in edit mode
+                this.setupTouchRotation();
+            }
+            
+            setupTouchRotation() {
+                const canvas = $('canvas3d');
+                let touchStart = null;
+                
+                canvas.addEventListener('touchstart', (e) => {
+                    if (this.mode !== 'edit' || e.touches.length !== 2) return;
+                    e.preventDefault();
+                    const [t1, t2] = [e.touches[0], e.touches[1]];
+                    touchStart = {
+                        x: (t1.clientX + t2.clientX) / 2,
+                        y: (t1.clientY + t2.clientY) / 2,
+                        rotX: this.modelRotation.x,
+                        rotY: this.modelRotation.y
+                    };
+                }, { passive: false });
+                
+                canvas.addEventListener('touchmove', (e) => {
+                    if (!touchStart || e.touches.length !== 2) return;
+                    e.preventDefault();
+                    const [t1, t2] = [e.touches[0], e.touches[1]];
+                    const cx = (t1.clientX + t2.clientX) / 2;
+                    const cy = (t1.clientY + t2.clientY) / 2;
+                    this.modelRotation.y = touchStart.rotY + (cx - touchStart.x) * 0.01;
+                    this.modelRotation.x = touchStart.rotX + (cy - touchStart.y) * 0.01;
+                }, { passive: false });
+                
+                canvas.addEventListener('touchend', () => { touchStart = null; });
+                
+                // Mouse fallback
+                let mouseDown = false, mouseStart = null;
+                canvas.addEventListener('mousedown', (e) => {
+                    if (this.mode !== 'edit') return;
+                    mouseDown = true;
+                    mouseStart = { x: e.clientX, y: e.clientY, rotX: this.modelRotation.x, rotY: this.modelRotation.y };
+                });
+                canvas.addEventListener('mousemove', (e) => {
+                    if (!mouseDown || !mouseStart) return;
+                    this.modelRotation.y = mouseStart.rotY + (e.clientX - mouseStart.x) * 0.005;
+                    this.modelRotation.x = mouseStart.rotX + (e.clientY - mouseStart.y) * 0.005;
+                });
+                canvas.addEventListener('mouseup', () => { mouseDown = false; });
+                canvas.addEventListener('mouseleave', () => { mouseDown = false; });
             }
             
             updateProjection() {
-                // Only update face tracking in view mode
                 if (this.mode === 'view') {
                     this.smooth.x += (this.face.x - this.smooth.x) * 0.1;
                     this.smooth.y += (this.face.y - this.smooth.y) * 0.1;
@@ -2210,18 +1748,39 @@
             
             animate() {
                 requestAnimationFrame(() => this.animate());
+                
+                const now = performance.now();
+                const dt = (now - this.lastTime) / 1000;
+                this.lastTime = now;
+                
+                updateFPS();
                 this.updateProjection();
                 
+                // Update tesseract
+                if (this.tesseract) {
+                    this.tesseract.update(dt);
+                }
+                
+                // Update particles
+                if (this.particles) {
+                    const pos = this.particles.geometry.attributes.position.array;
+                    for (let i = 0; i < pos.length; i += 3) {
+                        pos[i + 2] += dt * 20;
+                        if (pos[i + 2] > 0) pos[i + 2] = -500;
+                    }
+                    this.particles.geometry.attributes.position.needsUpdate = true;
+                }
+                
                 // Apply rotation to object
-                if (this.obj) {
+                if (this.obj && !this.tesseract) {
                     this.obj.rotation.x = this.baseRotation.x + this.modelRotation.x;
                     this.obj.rotation.y = this.baseRotation.y + this.modelRotation.y;
                     this.obj.rotation.z = this.baseRotation.z + this.modelRotation.z;
                     
                     // Animate gem rings
                     this.obj.children.forEach(c => {
-                        if (c.userData && c.userData.spd) {
-                            c.rotation.z += c.userData.spd;
+                        if (c.userData && c.userData.speed) {
+                            c.rotation.z += c.userData.speed;
                         }
                     });
                 }
@@ -2230,8 +1789,7 @@
             }
         }
         
-        // START
-        log('Page loaded');
+        // Start
         new App();
     })();
     </script>
